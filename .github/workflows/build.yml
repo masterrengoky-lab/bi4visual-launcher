@@ -50,7 +50,7 @@ jobs:
           java-version: ${{ startsWith(matrix.mc, '1.') && '21' || '25' }}
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: ${{ startsWith(matrix.mc, '1.') && '8.14.3' || '9.1.0' }}
+          gradle-version: ${{ startsWith(matrix.mc, '1.') && '8.14.3' || 'current' }}
       - run: gradle build -Pminecraft_version=${{ matrix.mc }} --no-daemon 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
         shell: bash
       - name: Show build errors
