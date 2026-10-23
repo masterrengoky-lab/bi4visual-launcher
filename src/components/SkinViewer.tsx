@@ -9,7 +9,7 @@ export default function SkinViewer({ skin, slim, name, width, height, walking }:
   const viewer = useRef<Viewer | null>(null);
 
   useEffect(() => {
-    const v = new Viewer({ canvas: canvas.current!, width, height, zoom: 0.88, fov: 40 });
+    const v = new Viewer({ canvas: canvas.current!, width, height, zoom: 0.8, fov: 40 });
     v.autoRotate = true;
     v.autoRotateSpeed = 0.6;
     v.controls.enableZoom = false;

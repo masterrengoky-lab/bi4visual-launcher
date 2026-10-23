@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 
 /** Animated background: drifting colour glows, a faint block grid and floating pixels. */
-export default function Backdrop() {
+type Props = { image: string | null; dim: number; blur: number; particles: boolean };
+
+export default function Backdrop({ image, dim, blur, particles }: Props) {
   const pixels = useMemo(
     () =>
       Array.from({ length: 40 }, (_, i) => ({
@@ -15,12 +17,21 @@ export default function Backdrop() {
   );
   return (
     <div className="backdrop" aria-hidden>
-      <div className="glow glow-a" />
-      <div className="glow glow-b" />
-      <div className="glow glow-c" />
-      <div className="grid" />
+      {image ? (
+        <>
+          <div className="bg-image" style={{ backgroundImage: `url("${image}")`, filter: blur ? `blur(${blur}px)` : undefined }} />
+          <div className="bg-dim" style={{ opacity: dim / 100 }} />
+        </>
+      ) : (
+        <>
+          <div className="glow glow-a" />
+          <div className="glow glow-b" />
+          <div className="glow glow-c" />
+          <div className="grid" />
+        </>
+      )}
       <div className="horizon" />
-      {pixels.map((p, i) => (
+      {particles && pixels.map((p, i) => (
         <span
           key={i}
           className="pixel"

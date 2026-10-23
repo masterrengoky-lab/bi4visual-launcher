@@ -3,6 +3,7 @@
 //! Has no UI dependencies so it can be tested on its own.
 
 pub mod accounts;
+pub mod backgrounds;
 pub mod download;
 pub mod fabric;
 pub mod forge;

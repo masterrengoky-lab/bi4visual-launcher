@@ -20,6 +20,13 @@ pub struct Settings {
     /// Instance started by the Play button.
     pub selected_instance: Option<String>,
     pub show_snapshots: bool,
+    /// File name of the custom background in `<root>/backgrounds`.
+    pub background: Option<String>,
+    /// How much the background is darkened, 0–90 %.
+    pub bg_dim: u8,
+    /// Background blur in pixels, 0–20.
+    pub bg_blur: u8,
+    pub particles: bool,
 }
 
 impl Default for Settings {
@@ -34,6 +41,10 @@ impl Default for Settings {
             hide_on_launch: true,
             selected_instance: None,
             show_snapshots: false,
+            background: None,
+            bg_dim: 45,
+            bg_blur: 3,
+            particles: true,
         }
     }
 }

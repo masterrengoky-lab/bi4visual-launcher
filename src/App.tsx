@@ -37,6 +37,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<Accounts | null>(null);
   const [instances, setInstances] = useState<Instances | null>(null);
   const [skin, setSkin] = useState<Skin | null>(null);
+  const [background, setBackground] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalName>(null);
   const [game, setGame] = useState<GameState["state"]>("stopped");
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -47,6 +48,7 @@ export default function App() {
     api.getSettings().then(setSettings);
     api.accounts().then(setAccounts);
     api.instances().then(setInstances);
+    api.background().then(setBackground, () => {});
     const subs = [
       on<Progress>("progress", setProgress),
       on<string>("game-log", (line) => setLog((l) => (l.length >= MAX_LOG ? [...l.slice(-MAX_LOG / 2), line] : [...l, line]))),
@@ -108,7 +110,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <Backdrop />
+      <Backdrop
+        image={background}
+        dim={settings?.bg_dim ?? 45}
+        blur={settings?.bg_blur ?? 3}
+        particles={settings?.particles ?? true}
+      />
       <TitleBar />
 
       <div className="layout">
@@ -219,7 +226,7 @@ export default function App() {
       </div>
 
       {modal === "accounts" && accounts && <AccountsModal accounts={accounts} onChange={setAccounts} onClose={close} />}
-      {modal === "settings" && settings && <SettingsModal settings={settings} onSave={updateSettings} onClose={close} />}
+      {modal === "settings" && settings && <SettingsModal settings={settings} background={background} onBackground={setBackground} onSave={updateSettings} onClose={close} />}
       {modal === "log" && <LogModal lines={log} onClose={close} />}
       {modal === "instances" && instances && settings && (
         <InstancesPanel

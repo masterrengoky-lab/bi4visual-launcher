@@ -11,6 +11,10 @@ export type Settings = {
   hide_on_launch: boolean;
   selected_instance: string | null;
   show_snapshots: boolean;
+  background: string | null;
+  bg_dim: number;
+  bg_blur: number;
+  particles: boolean;
 };
 
 export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge";
@@ -49,6 +53,9 @@ export type GameState = { state: "installing" | "running" | "stopped"; code: num
 export const api = {
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  background: () => invoke<string | null>("background_get"),
+  setBackground: (data: string) => invoke<string>("background_set", { data }),
+  clearBackground: () => invoke<void>("background_clear"),
 
   gameVersions: () => invoke<GameVersions>("game_versions"),
   loaderVersions: (loader: Loader, game: string) => invoke<string[]>("loader_versions", { loader, game }),
@@ -109,4 +116,14 @@ export function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(".0", "")} млн`;
   if (n >= 1000) return `${Math.round(n / 1000)} тыс.`;
   return String(n);
+}
+
+/** Reads a picked file as a data URL. */
+export function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
 }

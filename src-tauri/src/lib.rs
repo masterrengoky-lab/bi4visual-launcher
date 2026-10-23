@@ -2,6 +2,7 @@
 
 use bi4visual_core::{
     accounts::{self, AccountStore, AccountView},
+    backgrounds,
     download, fabric, forge,
     instances::{self, Instance, Loader, ModFile},
     java, launch,
@@ -53,8 +54,34 @@ fn get_settings(st: State<AppState>) -> Settings {
 }
 
 #[tauri::command]
-fn save_settings(st: State<AppState>, settings: Settings) -> Res<()> {
+fn save_settings(st: State<AppState>, mut settings: Settings) -> Res<()> {
+    // The background file is managed by its own commands.
+    settings.background = Settings::load(&st.paths).background;
     settings.save(&st.paths).map_err(err)
+}
+
+#[tauri::command]
+fn background_get(st: State<AppState>) -> Option<String> {
+    let name = Settings::load(&st.paths).background?;
+    backgrounds::load(&st.paths, &name)
+}
+
+/// Saves a picture as the background and returns it as a data URL.
+#[tauri::command]
+fn background_set(st: State<AppState>, data: String) -> Res<String> {
+    let name = backgrounds::save_base64(&st.paths, &data).map_err(err)?;
+    let mut s = Settings::load(&st.paths);
+    s.background = Some(name.clone());
+    s.save(&st.paths).map_err(err)?;
+    backgrounds::load(&st.paths, &name).ok_or_else(|| "Не удалось прочитать картинку".into())
+}
+
+#[tauri::command]
+fn background_clear(st: State<AppState>) -> Res<()> {
+    backgrounds::clear(&st.paths);
+    let mut s = Settings::load(&st.paths);
+    s.background = None;
+    s.save(&st.paths).map_err(err)
 }
 
 fn open_dir(app: &AppHandle, dir: std::path::PathBuf) -> Res<()> {
@@ -421,6 +448,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
+            background_get,
+            background_set,
+            background_clear,
             game_versions,
             loader_versions,
             instances_list,
