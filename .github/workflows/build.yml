@@ -51,7 +51,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
-      - run: gradle build -Pminecraft_version=${{ matrix.mc }} --no-daemon
+      - run: gradle build -Pminecraft_version=${{ matrix.mc }} --no-daemon 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+        shell: bash
+      - name: Show build errors
+        if: failure()
+        run: grep -E "error:|What went wrong|Could not|> |requires|unsupported" -A2 build.log | head -40 | sed 's/^/::error::/'
       - run: |
           mkdir -p out
           cp $(ls build/libs/*.jar | grep -v -- -sources) out/bi4visual-${{ matrix.mc }}.jar
