@@ -232,13 +232,13 @@ p { margin: 0; line-height: 1.45; }
 }
 @keyframes fade { from { opacity: 0; } }
 .modal {
-  width: min(480px, 92vw); max-height: 88%; display: flex; flex-direction: column;
+  width: min(480px, 92vw); max-height: calc(100vh - 90px); display: flex; flex-direction: column;
   background: var(--panel); border: 2px solid var(--line); border-radius: 16px;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); animation: rise-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 @keyframes rise-in { from { opacity: 0; transform: translateY(16px) scale(0.97); } }
 .modal.wide { width: min(720px, 94vw); }
-.modal.large { width: min(920px, 94vw); height: 88%; }
+.modal.large { width: min(920px, 94vw); height: min(860px, calc(100vh - 90px)); }
 .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
 .modal-head h2 { margin: 0; font-family: var(--brand); font-size: 18px; font-weight: 900; }
 .modal-body { flex: 1; min-height: 0; padding: 16px 18px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
