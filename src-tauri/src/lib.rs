@@ -1,11 +1,13 @@
 //! Tauri shell: exposes the core to the UI as commands and events.
 
+mod media;
+
 use bi4visual_core::{
     accounts::{self, AccountStore, AccountView},
     backgrounds,
     download, fabric, forge,
     instances::{self, Instance, Loader, ModFile},
-    java, launch,
+    java, launch, lyrics,
     manifest::{self, VersionJson},
     microsoft,
     modrinth::{self, ProjectType, SearchResult},
@@ -14,6 +16,7 @@ use bi4visual_core::{
     skins, Progress, ProgressFn,
 };
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -383,7 +386,8 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     }
 
     let _ = app.emit("game-state", GameState { state: "installing", code: None });
-    let result: anyhow::Result<(launch::LaunchPlan, String)> = async {
+    let bundled_mods = app.path().resource_dir().map(|d| d.join("mods")).unwrap_or_default();
+    let result: anyhow::Result<(launch::LaunchPlan, String, bool)> = async {
         let mut inst = ensure_default_instance(&st).await?;
         let version = instances::ensure_ready(&st.client, &st.paths, &mut inst, &progress).await?;
         let major = VersionJson::load_resolved(&st.paths, &version)?.java_major();
@@ -394,11 +398,13 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         inst.last_played = Some(instances::now());
         inst.save(&st.paths)?;
         skins::apply_pack(&st.paths, &account, &inst.game_dir(&st.paths))?;
+        let lyrics_mod = inst.loader == Loader::Fabric
+            && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, settings.lyrics)?;
         let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
-        Ok((plan, inst.id))
+        Ok((plan, inst.id, lyrics_mod))
     }
     .await;
-    let (plan, instance_id) = match result {
+    let (plan, instance_id, lyrics_mod) = match result {
         Ok(p) => p,
         Err(e) => {
             let _ = app.emit("game-state", GameState { state: "stopped", code: None });
@@ -440,6 +446,11 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         }
     }
 
+    let stop_media = Arc::new(AtomicBool::new(false));
+    if lyrics_mod {
+        tokio::spawn(media::watch(st.client.clone(), plan.game_dir.clone(), stop_media.clone()));
+    }
+
     // Wait in the background so the command returns right away; the lock lives until exit.
     let app2 = app.clone();
     let paths = st.paths.clone();
@@ -447,6 +458,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     tokio::spawn(async move {
         let _hold = guard;
         let code = child.wait().await.ok().and_then(|s| s.code());
+        stop_media.store(true, Ordering::Relaxed);
         if let Ok(mut inst) = Instance::load(&paths, &instance_id) {
             inst.playtime_secs += started.elapsed().as_secs();
             let _ = inst.save(&paths);

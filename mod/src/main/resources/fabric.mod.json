@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "bi4visual",
+  "version": "${version}",
+  "name": "bi4visual",
+  "description": "Визуалы bi4visual launcher: текст играющей песни прямо в мире.",
+  "authors": ["bi4visual"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.bi4visual.mod.Bi4visualClient"]
+  },
+  "mixins": ["bi4visual.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16",
+    "minecraft": "${mc}"
+  }
+}

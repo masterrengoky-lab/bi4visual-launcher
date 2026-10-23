@@ -114,6 +114,11 @@ export default function SettingsModal({ settings, background, onBackground, onSa
         Скрывать лаунчер во время игры
       </label>
 
+      <label className="check">
+        <input type="checkbox" checked={s.lyrics} onChange={(e) => set("lyrics", e.target.checked)} />
+        Текст песни в мире, когда играет музыка (сборки Fabric 1.21.4+)
+      </label>
+
       <details>
         <summary>Для опытных</summary>
         <label className="field">

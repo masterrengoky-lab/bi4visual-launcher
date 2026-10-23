@@ -15,6 +15,7 @@ export type Settings = {
   bg_dim: number;
   bg_blur: number;
   particles: boolean;
+  lyrics: boolean;
   cosmetics: string[];
 };
 

@@ -3,3 +3,7 @@ dist/
 target/
 *.log
 *.tsbuildinfo
+
+mod/build/
+mod/.gradle/
+mod/run/

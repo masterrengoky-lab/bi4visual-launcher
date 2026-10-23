@@ -11,6 +11,7 @@ pub mod install;
 pub mod instances;
 pub mod java;
 pub mod launch;
+pub mod lyrics;
 pub mod manifest;
 pub mod microsoft;
 pub mod modrinth;

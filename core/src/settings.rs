@@ -29,6 +29,8 @@ pub struct Settings {
     pub particles: bool,
     /// Cosmetics worn by the model in the launcher.
     pub cosmetics: Vec<String>,
+    /// Song lyrics in the world while music plays (needs a Fabric instance).
+    pub lyrics: bool,
 }
 
 impl Default for Settings {
@@ -48,6 +50,7 @@ impl Default for Settings {
             bg_blur: 3,
             particles: true,
             cosmetics: Vec::new(),
+            lyrics: true,
         }
     }
 }
