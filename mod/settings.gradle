@@ -6,3 +6,9 @@ pluginManagement {
 }
 
 rootProject.name = 'bi4visual-mod'
+
+// From 26.1 the game ships without obfuscation and needs a different Loom setup.
+def mc = providers.gradleProperty('minecraft_version').get()
+if (!mc.startsWith('1.')) {
+    rootProject.buildFileName = 'build-unobfuscated.gradle'
+}

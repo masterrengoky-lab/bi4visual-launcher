@@ -13,7 +13,9 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
 
 /**
  * Lines of the playing song floating in the sky around the player. Each line
@@ -61,15 +63,14 @@ public final class Lyrics3D {
         }
         long now = System.currentTimeMillis();
         Camera camera = mc.gameRenderer.getMainCamera();
-        update(NowPlaying.get(), now, camera);
+        update(NowPlaying.get(), now, mc.player);
         if (shown.isEmpty()) {
             return;
         }
 
         // The level renderer has already popped its view matrix, so rotate to the camera ourselves.
         PoseStack pose = new PoseStack();
-        pose.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
-        pose.mulPose(Axis.YP.rotationDegrees(camera.getYRot() + 180f));
+        pose.mulPose(new Quaternionf(camera.rotation()).conjugate());
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
         for (Floating line : shown) {
             draw(line, now, pose, buffers, mc.font, camera);
@@ -77,7 +78,7 @@ public final class Lyrics3D {
         buffers.endBatch();
     }
 
-    private static void update(NowPlaying.Data np, long now, Camera camera) {
+    private static void update(NowPlaying.Data np, long now, Entity viewer) {
         String key = np == null ? "" : np.title + "\u0000" + np.artist;
         if (!key.equals(track)) {
             track = key;
@@ -95,7 +96,7 @@ public final class Lyrics3D {
                 fadeAll(now);
                 String text = index >= 0 ? np.lines.get(index).text : "";
                 if (text != null && !text.isBlank()) {
-                    spawn(text.trim(), now, camera);
+                    spawn(text.trim(), now, viewer);
                 }
             }
         }
@@ -113,11 +114,11 @@ public final class Lyrics3D {
         }
     }
 
-    private static void spawn(String text, long now, Camera camera) {
+    private static void spawn(String text, long now, Entity viewer) {
         // Lines take turns left and right of where the player looks, a bit above the crosshair.
         side = -side;
-        float yaw = camera.getYRot() + side * (8f + random.nextFloat() * 22f);
-        float pitch = Mth.clamp(camera.getXRot() - 6f + (random.nextFloat() - 0.5f) * 14f, -75f, 45f);
+        float yaw = viewer.getYRot() + side * (8f + random.nextFloat() * 22f);
+        float pitch = Mth.clamp(viewer.getXRot() - 6f + (random.nextFloat() - 0.5f) * 14f, -75f, 45f);
         float roll = (random.nextFloat() - 0.5f) * 10f;
         shown.add(new Floating(text, yaw, pitch, roll, now));
         while (shown.size() > 4) {
