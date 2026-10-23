@@ -63,7 +63,6 @@ export default function SkinPanel({ account, skin, onChanged, onAccounts, onClos
           <SkinViewer
             skin={preview?.url ?? skin?.data_url ?? null}
             slim={preview ? slim : skin?.slim ?? false}
-            name={account?.name}
             width={280}
             height={380}
           />

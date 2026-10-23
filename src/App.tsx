@@ -165,7 +165,6 @@ export default function App() {
           <SkinViewer
             skin={skin?.data_url ?? null}
             slim={skin?.slim ?? false}
-            name={account?.name}
             width={Math.min(420, stageSize.w)}
             height={stageSize.h}
             walking={game === "installing"}
