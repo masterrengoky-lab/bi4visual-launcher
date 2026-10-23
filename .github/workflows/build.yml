@@ -55,7 +55,12 @@ jobs:
         shell: bash
       - name: Show build errors
         if: failure()
-        run: grep -E "error:|What went wrong|Could not|> |requires|unsupported" -A2 build.log | head -40 | sed 's/^/::error::/'
+        run: |
+          grep -E "error:|What went wrong|Could not|> |requires|unsupported" -A2 build.log | head -40 | sed 's/^/::error::/'
+          jar=$(find ~/.gradle/caches -name "minecraft-*client*.jar" -o -name "minecraft-*merged*.jar" -o -name "minecraft-common*.jar" | head -1)
+          [ -n "$jar" ] || exit 0
+          info=$( { echo "jar: $jar"; unzip -l "$jar" | grep -oE "net/minecraft/client/renderer/[A-Za-z]*(Buffer|Source|Submit|Node|Collector)[A-Za-z$]*\.class" | sort -u | head -40; javap -cp "$jar" net.minecraft.client.gui.Font | grep -i "draw\|submit" ; } | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error::$info"
       - run: |
           mkdir -p out
           cp $(ls build/libs/*.jar | grep -v -- -sources) out/bi4visual-${{ matrix.mc }}.jar
