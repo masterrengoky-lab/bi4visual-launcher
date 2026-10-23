@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, type Settings } from "../lib/api";
+import { useState } from "react";
+import type { Settings } from "../lib/api";
 import Modal from "./Modal";
 
 type Props = { settings: Settings; onSave: (s: Settings) => void; onClose: () => void };
@@ -8,10 +8,6 @@ const MEMORY_STEPS = [2048, 3072, 4096, 6144, 8192, 12288, 16384];
 
 export default function SettingsModal({ settings, onSave, onClose }: Props) {
   const [s, setS] = useState(settings);
-  const [defaultDir, setDefaultDir] = useState("");
-  useEffect(() => {
-    api.defaultGameDir().then(setDefaultDir);
-  }, []);
 
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS((cur) => ({ ...cur, [k]: v }));
   const num = (v: string) => (v.trim() === "" ? null : Math.max(1, Number(v) || 0));
@@ -49,14 +45,6 @@ export default function SettingsModal({ settings, onSave, onClose }: Props) {
       <label className="check">
         <input type="checkbox" checked={s.hide_on_launch} onChange={(e) => set("hide_on_launch", e.target.checked)} />
         Скрывать лаунчер во время игры
-      </label>
-
-      <label className="field">
-        <span>Папка игры</span>
-        <div className="row">
-          <input className="input grow" placeholder={defaultDir} value={s.game_dir ?? ""} onChange={(e) => set("game_dir", e.target.value || null)} />
-          <button className="btn" onClick={() => api.openGameDir()}>Открыть</button>
-        </div>
       </label>
 
       <details>

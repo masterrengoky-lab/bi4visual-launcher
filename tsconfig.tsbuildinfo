@@ -1,1 +1,0 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/components/AccountsModal.tsx","./src/components/Avatar.tsx","./src/components/LogModal.tsx","./src/components/Modal.tsx","./src/components/SettingsModal.tsx","./src/components/TitleBar.tsx","./src/components/VersionsModal.tsx","./src/lib/api.ts","./src/lib/useAsync.ts","./src/lib/versions.ts"],"version":"5.6.3"}

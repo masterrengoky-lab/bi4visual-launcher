@@ -73,6 +73,10 @@ pub async fn install(client: &reqwest::Client, paths: &Paths, id: &str, progress
     let features = HashMap::new();
     for lib in v.libraries.iter().filter(|l| crate::rules::allowed(l.rules.as_deref(), &features)) {
         for a in [lib.main_artifact(), lib.natives_artifact()].into_iter().flatten() {
+            // Forge marks files its installer generates with an empty URL.
+            if a.url.is_empty() {
+                continue;
+            }
             if let Some(path) = &a.path {
                 jobs.push(Job {
                     url: a.url.clone(),

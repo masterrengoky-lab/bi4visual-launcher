@@ -69,11 +69,11 @@ pub fn build(
     account: &Account,
     settings: &Settings,
     java: PathBuf,
+    game_dir: PathBuf,
 ) -> Result<LaunchPlan> {
     let v = VersionJson::load_resolved(paths, version_id)?;
     let jar_id = VersionJson::jar_id(paths, version_id)?;
     let jar = paths.version_jar(&jar_id);
-    let game_dir = settings.game_dir(paths);
     std::fs::create_dir_all(&game_dir)?;
 
     let sep = classpath_separator();
@@ -178,7 +178,7 @@ mod tests {
             "libraries": [{"name": "a:b:1", "downloads": {"artifact": {"path": "a/b/1/b-1.jar", "url": "u"}}}]
         }));
         let acc = crate::accounts::offline("Steve").unwrap();
-        let plan = build(&paths, "1.21.1", &acc, &Settings::default(), "java".into()).unwrap();
+        let plan = build(&paths, "1.21.1", &acc, &Settings::default(), "java".into(), tmp.path().join("g")).unwrap();
         let a = &plan.args;
         assert_eq!(a[0], "-Xmx4096M");
         let main = a.iter().position(|x| x == "net.minecraft.client.main.Main").unwrap();
@@ -201,7 +201,7 @@ mod tests {
         }));
         let acc = crate::accounts::offline("Alex").unwrap();
         let s = Settings { width: Some(1280), height: Some(720), ..Default::default() };
-        let plan = build(&paths, "1.8.9", &acc, &s, "java".into()).unwrap();
+        let plan = build(&paths, "1.8.9", &acc, &s, "java".into(), tmp.path().join("g")).unwrap();
         assert!(plan.args.iter().any(|x| x.starts_with("-Djava.library.path=")));
         assert!(plan.args.ends_with(&["--width".into(), "1280".into(), "--height".into(), "720".into()]));
         assert!(plan.args.contains(&"{}".to_string()));

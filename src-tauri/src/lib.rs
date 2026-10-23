@@ -2,12 +2,15 @@
 
 use bi4visual_core::{
     accounts::{self, AccountStore, AccountView},
-    download, fabric, install, java, launch,
+    download, fabric, forge,
+    instances::{self, Instance, Loader, ModFile},
+    java, launch,
     manifest::{self, VersionJson},
     microsoft,
+    modrinth::{self, ProjectType, SearchResult},
     paths::Paths,
     settings::Settings,
-    Progress, ProgressFn,
+    skins, Progress, ProgressFn,
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -54,84 +57,177 @@ fn save_settings(st: State<AppState>, settings: Settings) -> Res<()> {
     settings.save(&st.paths).map_err(err)
 }
 
-#[tauri::command]
-fn default_game_dir(st: State<AppState>) -> String {
-    st.paths.default_game_dir().to_string_lossy().into_owned()
-}
-
-#[tauri::command]
-fn open_game_dir(app: AppHandle, st: State<AppState>) -> Res<()> {
+fn open_dir(app: &AppHandle, dir: std::path::PathBuf) -> Res<()> {
     use tauri_plugin_opener::OpenerExt;
-    let dir = Settings::load(&st.paths).game_dir(&st.paths);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
 }
 
-// ---------- versions ----------
+// ---------- game versions and loaders ----------
 
 #[derive(Serialize)]
-struct VersionItem {
+struct GameVersion {
     id: String,
     kind: String,
-    installed: bool,
 }
 
 #[derive(Serialize)]
-struct VersionList {
-    latest: Option<String>,
-    online: bool,
-    versions: Vec<VersionItem>,
+struct GameVersions {
+    latest: String,
+    versions: Vec<GameVersion>,
 }
 
 #[tauri::command]
-async fn list_versions(st: State<'_, AppState>) -> Res<VersionList> {
-    let installed = manifest::installed_versions(&st.paths);
-    match manifest::fetch_manifest(&st.client).await {
-        Ok(m) => {
-            let mut versions: Vec<VersionItem> = installed
-                .iter()
-                .filter(|id| !m.versions.iter().any(|v| &v.id == *id))
-                .map(|id| VersionItem { id: id.clone(), kind: "modded".into(), installed: true })
-                .collect();
-            versions.extend(m.versions.into_iter().map(|v| VersionItem {
-                installed: installed.contains(&v.id),
-                id: v.id,
-                kind: v.kind,
-            }));
-            Ok(VersionList { latest: Some(m.latest.release), online: true, versions })
+async fn game_versions(st: State<'_, AppState>) -> Res<GameVersions> {
+    let m = manifest::fetch_manifest(&st.client).await.map_err(err)?;
+    Ok(GameVersions {
+        latest: m.latest.release,
+        versions: m.versions.into_iter().map(|v| GameVersion { id: v.id, kind: v.kind }).collect(),
+    })
+}
+
+#[tauri::command]
+async fn loader_versions(st: State<'_, AppState>, loader: Loader, game: String) -> Res<Vec<String>> {
+    let c = &st.client;
+    match loader {
+        Loader::Vanilla => Ok(vec![]),
+        Loader::Fabric => fabric::loader_versions(c, fabric::Flavor::Fabric, &game).await,
+        Loader::Quilt => fabric::loader_versions(c, fabric::Flavor::Quilt, &game).await,
+        Loader::Forge => forge::versions(c, forge::Flavor::Forge, &game).await,
+        Loader::NeoForge => forge::versions(c, forge::Flavor::NeoForge, &game).await,
+    }
+    .map_err(err)
+}
+
+// ---------- instances ----------
+
+#[derive(Serialize)]
+struct InstancesResponse {
+    instances: Vec<Instance>,
+    selected: Option<String>,
+}
+
+fn instances_response(paths: &Paths) -> InstancesResponse {
+    let list = instances::list(paths);
+    let settings = Settings::load(paths);
+    let selected = settings
+        .selected_instance
+        .filter(|id| list.iter().any(|i| &i.id == id))
+        .or_else(|| list.first().map(|i| i.id.clone()));
+    InstancesResponse { instances: list, selected }
+}
+
+#[tauri::command]
+fn instances_list(st: State<AppState>) -> InstancesResponse {
+    instances_response(&st.paths)
+}
+
+fn select(paths: &Paths, id: &str) -> Res<()> {
+    let mut s = Settings::load(paths);
+    s.selected_instance = Some(id.to_string());
+    s.save(paths).map_err(err)
+}
+
+#[tauri::command]
+fn instance_create(
+    st: State<AppState>,
+    name: String,
+    game: String,
+    loader: Loader,
+    loader_version: Option<String>,
+) -> Res<InstancesResponse> {
+    let inst = instances::create(&st.paths, &name, &game, loader, loader_version).map_err(err)?;
+    select(&st.paths, &inst.id)?;
+    Ok(instances_response(&st.paths))
+}
+
+#[tauri::command]
+fn instance_select(st: State<AppState>, id: String) -> Res<InstancesResponse> {
+    select(&st.paths, &id)?;
+    Ok(instances_response(&st.paths))
+}
+
+#[tauri::command]
+fn instance_delete(st: State<AppState>, id: String) -> Res<InstancesResponse> {
+    instances::delete(&st.paths, &id).map_err(err)?;
+    Ok(instances_response(&st.paths))
+}
+
+#[tauri::command]
+fn instance_open_dir(app: AppHandle, st: State<AppState>, id: String) -> Res<()> {
+    let inst = Instance::load(&st.paths, &id).map_err(err)?;
+    open_dir(&app, inst.game_dir(&st.paths))
+}
+
+/// The first time, makes a vanilla instance on the latest release and moves the
+/// old shared game folder (from version 0.1) into it.
+async fn ensure_default_instance(st: &AppState) -> anyhow::Result<Instance> {
+    let resp = instances_response(&st.paths);
+    if let Some(id) = resp.selected {
+        return Instance::load(&st.paths, &id);
+    }
+    let latest = manifest::fetch_manifest(&st.client).await?.latest.release;
+    let inst = instances::create(&st.paths, &format!("Minecraft {latest}"), &latest, Loader::Vanilla, None)?;
+    let old = st.paths.root.join("minecraft");
+    if old.is_dir() {
+        let dir = inst.game_dir(&st.paths);
+        for e in std::fs::read_dir(&old)?.flatten() {
+            let dest = dir.join(e.file_name());
+            if !dest.exists() {
+                let _ = std::fs::rename(e.path(), dest);
+            }
         }
-        Err(_) => Ok(VersionList {
-            latest: None,
-            online: false,
-            versions: installed.into_iter().map(|id| VersionItem { id, kind: "installed".into(), installed: true }).collect(),
-        }),
     }
+    select(&st.paths, &inst.id).map_err(anyhow::Error::msg)?;
+    Ok(inst)
+}
+
+// ---------- mods ----------
+
+#[tauri::command]
+fn mods_list(st: State<AppState>, instance: String) -> Res<Vec<ModFile>> {
+    let inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    Ok(instances::mod_files(&st.paths, &inst))
 }
 
 #[tauri::command]
-async fn fabric_loaders(st: State<'_, AppState>, game: String) -> Res<Vec<String>> {
-    fabric::loader_versions(&st.client, &game).await.map_err(err)
-}
-
-/// Creates the Fabric profile; files are downloaded when the game starts.
-#[tauri::command]
-async fn add_fabric(st: State<'_, AppState>, game: String, loader: String) -> Res<String> {
-    fabric::install_profile(&st.client, &st.paths, &game, &loader).await.map_err(err)
+fn mod_toggle(st: State<AppState>, instance: String, file: String, enabled: bool) -> Res<()> {
+    let inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    instances::set_mod_enabled(&st.paths, &inst, &file, enabled).map_err(err)
 }
 
 #[tauri::command]
-async fn install_version(app: AppHandle, st: State<'_, AppState>, id: String) -> Res<()> {
-    let _guard = st.busy.clone().try_lock_owned().map_err(|_| "Уже идёт установка или игра".to_string())?;
-    install::install(&st.client, &st.paths, &id, &progress_to(&app)).await.map_err(err)
+fn mod_remove(st: State<AppState>, instance: String, file: String) -> Res<()> {
+    let mut inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    instances::remove_mod(&st.paths, &mut inst, &file).map_err(err)
 }
 
 #[tauri::command]
-fn delete_version(st: State<AppState>, id: String) -> Res<()> {
-    let dir = st.paths.version_dir(&id);
-    if dir.starts_with(st.paths.versions()) && dir != st.paths.versions() {
-        std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+async fn modrinth_search(
+    st: State<'_, AppState>,
+    query: String,
+    kind: ProjectType,
+    instance: Option<String>,
+    offset: u32,
+) -> Res<SearchResult> {
+    let inst = instance.and_then(|id| Instance::load(&st.paths, &id).ok());
+    let game = inst.as_ref().map(|i| i.game_version.as_str());
+    let loader = inst.as_ref().and_then(|i| i.loader.modrinth());
+    modrinth::search(&st.client, &query, kind, game, loader, offset).await.map_err(err)
+}
+
+#[tauri::command]
+async fn modrinth_install_mod(st: State<'_, AppState>, instance: String, project: String) -> Res<Vec<String>> {
+    let mut inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    modrinth::install_mod(&st.client, &st.paths, &mut inst, &project).await.map_err(err)
+}
+
+#[tauri::command]
+async fn modrinth_install_pack(app: AppHandle, st: State<'_, AppState>, project: String) -> Res<InstancesResponse> {
+    let _guard = st.busy.clone().try_lock_owned().map_err(|_| "Сейчас идёт установка или игра".to_string())?;
+    let inst = modrinth::install_modpack(&st.client, &st.paths, &project, &progress_to(&app)).await.map_err(err)?;
+    select(&st.paths, &inst.id)?;
+    Ok(instances_response(&st.paths))
 }
 
 // ---------- accounts ----------
@@ -199,14 +295,33 @@ async fn ms_login_finish(st: State<'_, AppState>) -> Res<AccountsResponse> {
     Ok(accounts_response(&store))
 }
 
+#[tauri::command]
+async fn account_skin(st: State<'_, AppState>, id: String) -> Res<Option<skins::Skin>> {
+    let store = AccountStore::load(&st.paths);
+    let acc = store.accounts.iter().find(|a| a.id == id).ok_or("Аккаунт не найден")?;
+    skins::skin_for(&st.client, &st.paths, acc).await.map_err(err)
+}
+
+#[tauri::command]
+async fn account_upload_skin(st: State<'_, AppState>, id: String, png: Vec<u8>, slim: bool) -> Res<()> {
+    let mut store = AccountStore::load(&st.paths);
+    let mut acc = store.accounts.iter().find(|a| a.id == id).cloned().ok_or("Аккаунт не найден")?;
+    if let Some(fresh) = microsoft::refresh_if_needed(&st.client, &acc).await.map_err(err)? {
+        store.upsert(fresh.clone());
+        store.save(&st.paths).map_err(err)?;
+        acc = fresh;
+    }
+    skins::upload(&st.client, &acc, png, slim).await.map_err(err)
+}
+
 // ---------- play ----------
 
-/// Installs what is missing, then starts the selected version with the selected account.
+/// Installs what is missing, then starts the selected instance with the selected account.
 #[tauri::command]
 async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     let guard = st.busy.clone().try_lock_owned().map_err(|_| "Игра уже запущена".to_string())?;
     let progress = progress_to(&app);
-    let mut settings = Settings::load(&st.paths);
+    let settings = Settings::load(&st.paths);
     let mut store = AccountStore::load(&st.paths);
     let mut account = store.selected().cloned().ok_or("Сначала добавьте аккаунт")?;
 
@@ -216,25 +331,18 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         account = fresh;
     }
 
-    let version = match settings.last_version.clone() {
-        Some(v) => v,
-        None => {
-            let latest = manifest::fetch_manifest(&st.client).await.map_err(err)?.latest.release;
-            settings.last_version = Some(latest.clone());
-            settings.save(&st.paths).map_err(err)?;
-            latest
-        }
-    };
-
     let _ = app.emit("game-state", GameState { state: "installing", code: None });
     let result: anyhow::Result<launch::LaunchPlan> = async {
-        install::install(&st.client, &st.paths, &version, &progress).await?;
+        let mut inst = ensure_default_instance(&st).await?;
+        let version = instances::ensure_ready(&st.client, &st.paths, &mut inst, &progress).await?;
         let major = VersionJson::load_resolved(&st.paths, &version)?.java_major();
         let java_bin = match settings.java_path.clone().filter(|p| !p.trim().is_empty()) {
             Some(p) => p.into(),
             None => java::ensure(&st.client, &st.paths, major, &progress).await?,
         };
-        launch::build(&st.paths, &version, &account, &settings, java_bin)
+        inst.last_played = Some(instances::now());
+        inst.save(&st.paths)?;
+        launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))
     }
     .await;
     let plan = match result {
@@ -257,11 +365,12 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         format!("Не удалось запустить Java: {e}")
     })?;
 
-    for pipe in [child.stdout.take().map(|p| Box::new(p) as Box<dyn tokio::io::AsyncRead + Send + Unpin>),
-                 child.stderr.take().map(|p| Box::new(p) as Box<dyn tokio::io::AsyncRead + Send + Unpin>)]
-        .into_iter()
-        .flatten()
-    {
+    type Pipe = Box<dyn tokio::io::AsyncRead + Send + Unpin>;
+    let pipes: [Option<Pipe>; 2] = [
+        child.stdout.take().map(|p| Box::new(p) as Pipe),
+        child.stderr.take().map(|p| Box::new(p) as Pipe),
+    ];
+    for pipe in pipes.into_iter().flatten() {
         let app = app.clone();
         tokio::spawn(async move {
             let mut lines = BufReader::new(pipe).lines();
@@ -272,9 +381,8 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     }
 
     let _ = app.emit("game-state", GameState { state: "running", code: None });
-    let window = app.get_webview_window("main");
     if settings.hide_on_launch {
-        if let Some(w) = &window {
+        if let Some(w) = app.get_webview_window("main") {
             let _ = w.hide();
         }
     }
@@ -306,19 +414,27 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
-            default_game_dir,
-            open_game_dir,
-            list_versions,
-            fabric_loaders,
-            add_fabric,
-            install_version,
-            delete_version,
+            game_versions,
+            loader_versions,
+            instances_list,
+            instance_create,
+            instance_select,
+            instance_delete,
+            instance_open_dir,
+            mods_list,
+            mod_toggle,
+            mod_remove,
+            modrinth_search,
+            modrinth_install_mod,
+            modrinth_install_pack,
             accounts_list,
             account_add_offline,
             account_select,
             account_remove,
             ms_login_start,
             ms_login_finish,
+            account_skin,
+            account_upload_skin,
             play,
         ])
         .run(tauri::generate_context!())

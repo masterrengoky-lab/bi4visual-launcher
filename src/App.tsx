@@ -1,20 +1,39 @@
-import { useEffect, useState } from "react";
-import { api, on, errorText, STAGE_NAMES, type Accounts, type GameState, type Progress, type Settings } from "./lib/api";
+import { useCallback, useEffect, useState } from "react";
+import {
+  api,
+  on,
+  errorText,
+  LOADER_NAMES,
+  STAGE_NAMES,
+  type Accounts,
+  type GameState,
+  type Instances,
+  type Progress,
+  type Settings,
+  type Skin,
+} from "./lib/api";
 import TitleBar from "./components/TitleBar";
+import Backdrop from "./components/Backdrop";
+import SkinViewer from "./components/SkinViewer";
+import Avatar from "./components/Avatar";
+import InstanceIcon from "./components/InstanceIcon";
 import AccountsModal from "./components/AccountsModal";
-import VersionsModal from "./components/VersionsModal";
 import SettingsModal from "./components/SettingsModal";
 import LogModal from "./components/LogModal";
-import Avatar from "./components/Avatar";
-import { versionLabel } from "./lib/versions";
+import InstancesPanel from "./components/InstancesPanel";
+import ModsPanel from "./components/ModsPanel";
+import ModpacksPanel from "./components/ModpacksPanel";
+import SkinPanel from "./components/SkinPanel";
 
-type ModalName = "accounts" | "versions" | "settings" | "log" | null;
+type ModalName = "accounts" | "settings" | "log" | "instances" | "mods" | "modpacks" | "skin" | null;
 
 const MAX_LOG = 2000;
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [accounts, setAccounts] = useState<Accounts | null>(null);
+  const [instances, setInstances] = useState<Instances | null>(null);
+  const [skin, setSkin] = useState<Skin | null>(null);
   const [modal, setModal] = useState<ModalName>(null);
   const [game, setGame] = useState<GameState["state"]>("stopped");
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -24,6 +43,7 @@ export default function App() {
   useEffect(() => {
     api.getSettings().then(setSettings);
     api.accounts().then(setAccounts);
+    api.instances().then(setInstances);
     const subs = [
       on<Progress>("progress", setProgress),
       on<string>("game-log", (line) => setLog((l) => (l.length >= MAX_LOG ? [...l.slice(-MAX_LOG / 2), line] : [...l, line]))),
@@ -39,6 +59,13 @@ export default function App() {
   }, []);
 
   const account = accounts?.accounts.find((a) => a.id === accounts.selected) ?? null;
+  const instance = instances?.instances.find((i) => i.id === instances.selected) ?? null;
+
+  const reloadSkin = useCallback(() => {
+    if (!account) return setSkin(null);
+    api.skin(account.id).then(setSkin, () => setSkin(null));
+  }, [account?.id]);
+  useEffect(reloadSkin, [reloadSkin]);
 
   async function play() {
     setError(null);
@@ -49,8 +76,8 @@ export default function App() {
     setLog([]);
     try {
       await api.play();
-      // The first Play picks the latest release; show it.
-      setSettings(await api.getSettings());
+      // The very first Play creates an instance; show it.
+      setInstances(await api.instances());
     } catch (e) {
       setError(errorText(e));
     }
@@ -63,84 +90,134 @@ export default function App() {
 
   const busy = game !== "stopped";
   const percent = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null;
+  const close = () => setModal(null);
 
   return (
     <div className="app">
-      <div className="backdrop" aria-hidden />
+      <Backdrop />
       <TitleBar />
 
-      <header className="topbar">
-        <button className="account-chip" onClick={() => setModal("accounts")}>
-          {account ? (
-            <>
-              <Avatar uuid={account.uuid} name={account.name} />
+      <div className="layout">
+        <nav className="side">
+          <Tile icon="📦" title="Сборки" hint="Версии и загрузчики" color="violet" onClick={() => setModal("instances")} />
+          <Tile icon="🧩" title="Моды" hint="Каталог Modrinth" color="green" onClick={() => setModal("mods")} />
+          <Tile icon="🗺️" title="Модпаки" hint="Готовые сборки" color="orange" onClick={() => setModal("modpacks")} />
+          <Tile icon="👕" title="Скин" hint="Внешний вид" color="blue" onClick={() => setModal("skin")} />
+        </nav>
+
+        <header className="topbar">
+          <button className="account-chip" onClick={() => setModal("accounts")}>
+            {account ? (
+              <>
+                <Avatar uuid={account.uuid} name={account.name} />
+                <span className="account-text">
+                  <b>{account.name}</b>
+                  <small>{account.kind === "microsoft" ? "Лицензия Microsoft" : "Без пароля"}</small>
+                </span>
+              </>
+            ) : (
               <span className="account-text">
-                <b>{account.name}</b>
-                <small>{account.kind === "microsoft" ? "Microsoft" : "Без пароля"}</small>
+                <b>Войти</b>
+                <small>Добавьте аккаунт</small>
               </span>
-            </>
-          ) : (
-            <span className="account-text">
-              <b>Войти</b>
-              <small>Добавьте аккаунт</small>
-            </span>
-          )}
-        </button>
-        <button className="icon-btn" title="Настройки" onClick={() => setModal("settings")}>
-          <GearIcon />
-        </button>
-      </header>
-
-      <main className="hero">
-        <img className="hero-logo" src="/logo.svg" alt="" />
-        <h1>bi4visual</h1>
-      </main>
-
-      <footer className="play-area">
-        {error && (
-          <div className="error-banner" role="alert">
-            <span>{error}</span>
-            {log.length > 0 && <button onClick={() => setModal("log")}>Журнал</button>}
-            <button onClick={() => setError(null)} aria-label="Закрыть">✕</button>
-          </div>
-        )}
-        <button className="play-btn" disabled={busy} onClick={play}>
-          {game === "running" ? "Игра запущена" : game === "installing" ? "Подготовка…" : "Играть"}
-        </button>
-        {progress && game === "installing" ? (
-          <div className="progress">
-            <div className="progress-bar" style={{ width: `${percent ?? 0}%` }} />
-            <span>
-              {STAGE_NAMES[progress.stage] ?? progress.stage}
-              {percent !== null && ` · ${percent}%`}
-            </span>
-          </div>
-        ) : (
-          <button className="version-btn" disabled={busy} onClick={() => setModal("versions")}>
-            {settings?.last_version ? `Версия ${versionLabel(settings.last_version)}` : "Последняя версия"} ▾
+            )}
+            <span className="chevron">▾</span>
           </button>
-        )}
-      </footer>
+          <button className="icon-btn" title="Настройки" onClick={() => setModal("settings")}>
+            <GearIcon />
+          </button>
+        </header>
 
-      {modal === "accounts" && accounts && (
-        <AccountsModal accounts={accounts} onChange={setAccounts} onClose={() => setModal(null)} />
-      )}
-      {modal === "versions" && settings && (
-        <VersionsModal
-          settings={settings}
-          onPick={(id) => {
-            updateSettings({ ...settings, last_version: id });
-            setModal(null);
-          }}
-          onSettings={updateSettings}
-          onClose={() => setModal(null)}
+        <main className="stage">
+          <div className="stage-glow" aria-hidden />
+          <SkinViewer
+            skin={skin?.data_url ?? null}
+            slim={skin?.slim ?? false}
+            name={account?.name}
+            width={360}
+            height={470}
+            walking={game === "installing"}
+          />
+        </main>
+
+        <footer className="play-area">
+          {error && (
+            <div className="error-banner" role="alert">
+              <span>{error}</span>
+              {log.length > 0 && <button onClick={() => setModal("log")}>Журнал</button>}
+              <button onClick={() => setError(null)} aria-label="Закрыть">✕</button>
+            </div>
+          )}
+          <div className="play-row">
+            <button className="instance-card" disabled={busy} onClick={() => setModal("instances")}>
+              <InstanceIcon instance={instance} size={56} />
+              <span className="instance-text">
+                <small>Сборка</small>
+                <b>{instance?.name ?? "Последняя версия"}</b>
+                <span>{instance ? `${instance.game_version} · ${LOADER_NAMES[instance.loader]}` : "Создастся при первом запуске"}</span>
+              </span>
+              <span className="chevron">▾</span>
+            </button>
+            <div className="play-col">
+              <button className="play-btn" disabled={busy} onClick={play}>
+                <span className="play-icon">▶</span>
+                {game === "running" ? "В игре" : game === "installing" ? "Загрузка" : "Играть"}
+              </button>
+              {progress && game === "installing" && (
+                <div className="progress">
+                  <div className="progress-bar" style={{ width: `${percent ?? 0}%` }} />
+                  <span>
+                    {STAGE_NAMES[progress.stage] ?? progress.stage}
+                    {percent !== null && progress.total > 1 && ` · ${percent}%`}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </footer>
+      </div>
+
+      {modal === "accounts" && accounts && <AccountsModal accounts={accounts} onChange={setAccounts} onClose={close} />}
+      {modal === "settings" && settings && <SettingsModal settings={settings} onSave={updateSettings} onClose={close} />}
+      {modal === "log" && <LogModal lines={log} onClose={close} />}
+      {modal === "instances" && instances && settings && (
+        <InstancesPanel
+          instances={instances}
+          showSnapshots={settings.show_snapshots}
+          onSnapshots={(v) => updateSettings({ ...settings, show_snapshots: v })}
+          onChange={setInstances}
+          onClose={close}
         />
       )}
-      {modal === "settings" && settings && (
-        <SettingsModal settings={settings} onSave={updateSettings} onClose={() => setModal(null)} />
+      {modal === "mods" && (
+        <ModsPanel instance={instance} onCreate={() => setModal("instances")} onClose={close} />
       )}
-      {modal === "log" && <LogModal lines={log} onClose={() => setModal(null)} />}
+      {modal === "modpacks" && (
+        <ModpacksPanel
+          busy={busy}
+          onInstalled={(i) => {
+            setInstances(i);
+            close();
+          }}
+          onClose={close}
+        />
+      )}
+      {modal === "skin" && (
+        <SkinPanel account={account} skin={skin} onChanged={reloadSkin} onAccounts={() => setModal("accounts")} onClose={close} />
+      )}
     </div>
+  );
+}
+
+function Tile({ icon, title, hint, color, onClick }: { icon: string; title: string; hint: string; color: string; onClick: () => void }) {
+  return (
+    <button className={`tile tile-${color}`} onClick={onClick}>
+      <span className="tile-icon" aria-hidden>{icon}</span>
+      <span className="tile-text">
+        <b>{title}</b>
+        <small>{hint}</small>
+      </span>
+    </button>
   );
 }
 

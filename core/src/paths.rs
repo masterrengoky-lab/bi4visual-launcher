@@ -43,9 +43,6 @@ impl Paths {
     pub fn java(&self) -> PathBuf {
         self.root.join("java")
     }
-    pub fn default_game_dir(&self) -> PathBuf {
-        self.root.join("minecraft")
-    }
     pub fn settings_file(&self) -> PathBuf {
         self.root.join("settings.json")
     }

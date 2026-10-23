@@ -5,14 +5,18 @@
 pub mod accounts;
 pub mod download;
 pub mod fabric;
+pub mod forge;
 pub mod install;
+pub mod instances;
 pub mod java;
 pub mod launch;
 pub mod manifest;
 pub mod microsoft;
+pub mod modrinth;
 pub mod paths;
 pub mod rules;
 pub mod settings;
+pub mod skins;
 
 pub const LAUNCHER_NAME: &str = "bi4visual-launcher";
 pub const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
