@@ -57,7 +57,11 @@ jobs:
         if: failure()
         run: |
           grep -E "error:|What went wrong|Could not|> |requires|unsupported" -A2 build.log | head -40 | sed 's/^/::error::/'
-          jar=$(find ~/.gradle/caches -name "minecraft-*client*.jar" -o -name "minecraft-*merged*.jar" -o -name "minecraft-common*.jar" | head -1)
+          jar=""
+          for j in $(find ~/.gradle .gradle -name "*.jar" -size +5M 2>/dev/null | grep -i minecraft); do
+            if unzip -l "$j" | grep -q "net/minecraft/client/gui/Font.class"; then jar=$j; break; fi
+          done
+          echo "::error::jars: $(find ~/.gradle .gradle -name '*.jar' -size +5M 2>/dev/null | grep -i minecraft | head -8 | tr '\n' ' ')"
           [ -n "$jar" ] || exit 0
           info=$( { echo "jar: $jar"; unzip -l "$jar" | grep -oE "net/minecraft/client/renderer/[A-Za-z]*(Buffer|Source|Submit|Node|Collector)[A-Za-z$]*\.class" | sort -u | head -40; javap -cp "$jar" net.minecraft.client.gui.Font | grep -i "draw\|submit" ; } | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error::$info"
