@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "bi4visual launcher",
+  "version": "0.1.0",
+  "identifier": "net.bi4visual.launcher",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "bi4visual launcher",
+        "width": 1100,
+        "height": 680,
+        "minWidth": 900,
+        "minHeight": 560,
+        "decorations": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: https://mc-heads.net; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "dmg", "appimage", "deb"],
+    "publisher": "bi4visual",
+    "category": "Game",
+    "shortDescription": "Лаунчер Minecraft",
+    "longDescription": "bi4visual launcher: любые версии Minecraft, Fabric, вход через Microsoft или по нику.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "languages": ["Russian", "English"],
+        "installMode": "currentUser"
+      }
+    }
+  }
+}
