@@ -9,7 +9,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -22,6 +21,8 @@ import org.joml.Quaternionf;
  * types itself in letter by letter, drifts up and fades out when the next one starts.
  */
 public final class Lyrics3D {
+    /** Packed light for "lit by sky and block light 15", same as LightTexture.FULL_BRIGHT. */
+    private static final int FULL_BRIGHT = 0xF000F0;
     private static final int TOP = 0xE6CCFF;
     private static final int BOTTOM = 0x9A66FF;
     private static final float DISTANCE = 10f;
@@ -161,7 +162,7 @@ public final class Lyrics3D {
                 float y = (1f - easeOut(letterIn)) * 5f;
                 int rgb = lerpColor(TOP, BOTTOM, n <= 1 ? 0f : i / (float) (n - 1));
                 font.drawInBatch(c, x, y, (a << 24) | rgb, true, pose.last().pose(), buffers,
-                        Font.DisplayMode.SEE_THROUGH, 0, LightTexture.FULL_BRIGHT);
+                        Font.DisplayMode.SEE_THROUGH, 0, FULL_BRIGHT);
             }
             x += w;
         }
