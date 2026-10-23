@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   on,
@@ -24,6 +24,9 @@ import InstancesPanel from "./components/InstancesPanel";
 import ModsPanel from "./components/ModsPanel";
 import ModpacksPanel from "./components/ModpacksPanel";
 import SkinPanel from "./components/SkinPanel";
+import FeaturedPacks from "./components/FeaturedPacks";
+import SkinFront from "./components/SkinFront";
+import { BookArt, ChestArt, GrassBlockArt } from "./components/PixelArt";
 
 type ModalName = "accounts" | "settings" | "log" | "instances" | "mods" | "modpacks" | "skin" | null;
 
@@ -50,12 +53,23 @@ export default function App() {
       on<GameState>("game-state", (s) => {
         setGame(s.state);
         if (s.state !== "installing") setProgress(null);
+        if (s.state === "stopped") api.instances().then(setInstances);
         if (s.state === "stopped" && s.code !== null && s.code !== 0) {
           setError(`Игра закрылась с ошибкой (код ${s.code}).`);
         }
       }),
     ];
     return () => subs.forEach((p) => p.then((off) => off()));
+  }, []);
+
+  const stageRef = useRef<HTMLElement>(null);
+  const [stageSize, setStageSize] = useState({ w: 380, h: 400 });
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setStageSize({ w: Math.floor(e.contentRect.width), h: Math.max(200, Math.floor(e.contentRect.height)) }));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   const account = accounts?.accounts.find((a) => a.id === accounts.selected) ?? null;
@@ -99,20 +113,28 @@ export default function App() {
 
       <div className="layout">
         <nav className="side">
-          <Tile icon="📦" title="Сборки" hint="Версии и загрузчики" color="violet" onClick={() => setModal("instances")} />
-          <Tile icon="🧩" title="Моды" hint="Каталог Modrinth" color="green" onClick={() => setModal("mods")} />
-          <Tile icon="🗺️" title="Модпаки" hint="Готовые сборки" color="orange" onClick={() => setModal("modpacks")} />
-          <Tile icon="👕" title="Скин" hint="Внешний вид" color="blue" onClick={() => setModal("skin")} />
+          <Tile title="Сборки" color="violet" onClick={() => setModal("instances")}>
+            <ChestArt className="tile-art chest" />
+          </Tile>
+          <Tile title="Мой скин" color="blue" onClick={() => setModal("skin")}>
+            <SkinFront className="tile-art skin" skin={skin?.data_url ?? null} slim={skin?.slim ?? false} />
+          </Tile>
+          <Tile title="Моды" color="green" onClick={() => setModal("mods")}>
+            <BookArt className="tile-art book" />
+          </Tile>
+          <Tile title="Модпаки" color="orange" onClick={() => setModal("modpacks")}>
+            <GrassBlockArt className="tile-art grass" />
+          </Tile>
         </nav>
 
         <header className="topbar">
-          <button className="account-chip" onClick={() => setModal("accounts")}>
+          <button className="hud account-chip" onClick={() => setModal("accounts")}>
             {account ? (
               <>
                 <Avatar uuid={account.uuid} name={account.name} />
                 <span className="account-text">
                   <b>{account.name}</b>
-                  <small>{account.kind === "microsoft" ? "Лицензия Microsoft" : "Без пароля"}</small>
+                  <small>{account.kind === "microsoft" ? "Лицензия" : "Офлайн-ник"}</small>
                 </span>
               </>
             ) : (
@@ -121,24 +143,31 @@ export default function App() {
                 <small>Добавьте аккаунт</small>
               </span>
             )}
-            <span className="chevron">▾</span>
+            <span className="chevron">⌄</span>
           </button>
-          <button className="icon-btn" title="Настройки" onClick={() => setModal("settings")}>
+          <button className="hud square" title="Журнал игры" onClick={() => setModal("log")}>
+            <BugIcon />
+          </button>
+          <button className="hud square" title="Настройки" onClick={() => setModal("settings")}>
             <GearIcon />
           </button>
         </header>
 
-        <main className="stage">
+        <main className="stage" ref={stageRef}>
           <div className="stage-glow" aria-hidden />
           <SkinViewer
             skin={skin?.data_url ?? null}
             slim={skin?.slim ?? false}
             name={account?.name}
-            width={360}
-            height={470}
+            width={Math.min(420, stageSize.w)}
+            height={stageSize.h}
             walking={game === "installing"}
           />
         </main>
+
+        <div className="right">
+          <FeaturedPacks busy={busy} onInstalled={setInstances} />
+        </div>
 
         <footer className="play-area">
           {error && (
@@ -148,30 +177,42 @@ export default function App() {
               <button onClick={() => setError(null)} aria-label="Закрыть">✕</button>
             </div>
           )}
+          <div className="quick-row">
+            <button className="mc-btn dark" onClick={() => setModal("mods")}>🧩 Моды сборки</button>
+            <button className="mc-btn dark" disabled={!instance} onClick={() => instance && api.openInstanceDir(instance.id)}>
+              📁 Папка сборки
+            </button>
+          </div>
           <div className="play-row">
             <button className="instance-card" disabled={busy} onClick={() => setModal("instances")}>
-              <InstanceIcon instance={instance} size={56} />
+              <InstanceIcon instance={instance} size={84} />
               <span className="instance-text">
-                <small>Сборка</small>
+                <small>▤ Сборка</small>
                 <b>{instance?.name ?? "Последняя версия"}</b>
                 <span>{instance ? `${instance.game_version} · ${LOADER_NAMES[instance.loader]}` : "Создастся при первом запуске"}</span>
               </span>
-              <span className="chevron">▾</span>
             </button>
             <div className="play-col">
               <button className="play-btn" disabled={busy} onClick={play}>
-                <span className="play-icon">▶</span>
-                {game === "running" ? "В игре" : game === "installing" ? "Загрузка" : "Играть"}
-              </button>
-              {progress && game === "installing" && (
-                <div className="progress">
-                  <div className="progress-bar" style={{ width: `${percent ?? 0}%` }} />
-                  <span>
-                    {STAGE_NAMES[progress.stage] ?? progress.stage}
-                    {percent !== null && progress.total > 1 && ` · ${percent}%`}
+                <span className="play-main">
+                  <span className="play-icon">▶</span>
+                  {game === "running" ? "В игре" : game === "installing" ? "Загрузка" : "Играть"}
+                </span>
+                {progress && game === "installing" ? (
+                  <span className="play-progress">
+                    <span className="play-progress-bar" style={{ width: `${percent ?? 0}%` }} />
                   </span>
-                </div>
-              )}
+                ) : (
+                  <span className="play-sub">{formatPlaytime(instance?.playtime_secs ?? 0)}</span>
+                )}
+              </button>
+              <div className="play-status">
+                {progress && game === "installing"
+                  ? `${STAGE_NAMES[progress.stage] ?? progress.stage}${percent !== null && progress.total > 1 ? ` · ${percent}%` : ""}`
+                  : game === "running"
+                    ? "Игра запущена"
+                    : "\u00a0"}
+              </div>
             </div>
           </div>
         </footer>
@@ -209,15 +250,32 @@ export default function App() {
   );
 }
 
-function Tile({ icon, title, hint, color, onClick }: { icon: string; title: string; hint: string; color: string; onClick: () => void }) {
+function Tile({ title, color, onClick, children }: { title: string; color: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <button className={`tile tile-${color}`} onClick={onClick}>
-      <span className="tile-icon" aria-hidden>{icon}</span>
-      <span className="tile-text">
-        <b>{title}</b>
-        <small>{hint}</small>
-      </span>
+      <span className="tile-art-wrap">{children}</span>
+      <span className="tile-label">{title}</span>
     </button>
+  );
+}
+
+function formatPlaytime(secs: number): string {
+  if (secs < 60) return "ещё не играли";
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return h > 0 ? `${h} ч ${m} мин` : `${m} мин`;
+}
+
+function BugIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 16 16" shapeRendering="crispEdges" fill="currentColor" aria-hidden>
+      <rect x="6" y="2" width="4" height="2" />
+      <rect x="4" y="4" width="8" height="9" />
+      <rect x="2" y="5" width="2" height="1" /><rect x="12" y="5" width="2" height="1" />
+      <rect x="1" y="8" width="3" height="1" /><rect x="12" y="8" width="3" height="1" />
+      <rect x="2" y="11" width="2" height="1" /><rect x="12" y="11" width="2" height="1" />
+      <rect x="7.5" y="5" width="1" height="7" fill="#17151f" />
+    </svg>
   );
 }
 

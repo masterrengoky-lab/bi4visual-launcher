@@ -5,6 +5,7 @@ export default function TitleBar() {
   const win = getCurrentWindow();
   return (
     <div className="titlebar" data-tauri-drag-region>
+      <div className="titlebar-spacer" data-tauri-drag-region />
       <div className="titlebar-name" data-tauri-drag-region>
         <img src="/logo.svg" alt="" width={18} height={18} />
         BI4VISUAL LAUNCHER

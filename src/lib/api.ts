@@ -22,6 +22,7 @@ export type Instance = {
   loader_version: string | null;
   icon_url: string | null;
   last_played: number | null;
+  playtime_secs: number;
 };
 export type Instances = { instances: Instance[]; selected: string | null };
 export type ModFile = { file_name: string; enabled: boolean; title: string; project_id: string | null; icon_url: string | null };

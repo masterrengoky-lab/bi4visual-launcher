@@ -63,6 +63,9 @@ pub struct Instance {
     pub created: u64,
     #[serde(default)]
     pub last_played: Option<u64>,
+    /// Total time in game, seconds.
+    #[serde(default)]
+    pub playtime_secs: u64,
 }
 
 /// A file in the instance's mods folder, with what we know about it.
@@ -184,6 +187,7 @@ pub fn create(paths: &Paths, name: &str, game_version: &str, loader: Loader, loa
         icon_url: None,
         created: now(),
         last_played: None,
+        playtime_secs: 0,
     };
     inst.save(paths)?;
     std::fs::create_dir_all(mods_dir(paths, &inst.id))?;

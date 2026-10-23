@@ -332,7 +332,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     }
 
     let _ = app.emit("game-state", GameState { state: "installing", code: None });
-    let result: anyhow::Result<launch::LaunchPlan> = async {
+    let result: anyhow::Result<(launch::LaunchPlan, String)> = async {
         let mut inst = ensure_default_instance(&st).await?;
         let version = instances::ensure_ready(&st.client, &st.paths, &mut inst, &progress).await?;
         let major = VersionJson::load_resolved(&st.paths, &version)?.java_major();
@@ -342,10 +342,11 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         };
         inst.last_played = Some(instances::now());
         inst.save(&st.paths)?;
-        launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))
+        let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
+        Ok((plan, inst.id))
     }
     .await;
-    let plan = match result {
+    let (plan, instance_id) = match result {
         Ok(p) => p,
         Err(e) => {
             let _ = app.emit("game-state", GameState { state: "stopped", code: None });
@@ -389,9 +390,15 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
 
     // Wait in the background so the command returns right away; the lock lives until exit.
     let app2 = app.clone();
+    let paths = st.paths.clone();
+    let started = std::time::Instant::now();
     tokio::spawn(async move {
         let _hold = guard;
         let code = child.wait().await.ok().and_then(|s| s.code());
+        if let Ok(mut inst) = Instance::load(&paths, &instance_id) {
+            inst.playtime_secs += started.elapsed().as_secs();
+            let _ = inst.save(&paths);
+        }
         if let Some(w) = app2.get_webview_window("main") {
             let _ = w.show();
             let _ = w.set_focus();

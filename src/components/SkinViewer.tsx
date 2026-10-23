@@ -9,7 +9,7 @@ export default function SkinViewer({ skin, slim, name, width, height, walking }:
   const viewer = useRef<Viewer | null>(null);
 
   useEffect(() => {
-    const v = new Viewer({ canvas: canvas.current!, width, height, zoom: 0.72, fov: 40 });
+    const v = new Viewer({ canvas: canvas.current!, width, height, zoom: 0.88, fov: 40 });
     v.autoRotate = true;
     v.autoRotateSpeed = 0.6;
     v.controls.enableZoom = false;
@@ -50,7 +50,7 @@ export default function SkinViewer({ skin, slim, name, width, height, walking }:
 }
 
 /** Our own simple default skin, used until the real one loads. */
-function placeholderSkin(): HTMLCanvasElement {
+export function placeholderSkin(): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const g = c.getContext("2d")!;
