@@ -27,6 +27,7 @@ import SkinPanel from "./components/SkinPanel";
 import FeaturedPacks from "./components/FeaturedPacks";
 import SkinFront from "./components/SkinFront";
 import { BookArt, ChestArt, GrassBlockArt } from "./components/PixelArt";
+import { EMOTES, type EmoteKind } from "./lib/livelyAnimation";
 
 type ModalName = "accounts" | "settings" | "log" | "instances" | "mods" | "modpacks" | "skin" | null;
 
@@ -43,6 +44,8 @@ export default function App() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
+  const [emote, setEmote] = useState<{ kind: EmoteKind; n: number } | null>(null);
+  const [emoteMenu, setEmoteMenu] = useState(false);
 
   useEffect(() => {
     api.getSettings().then(setSettings);
@@ -168,7 +171,30 @@ export default function App() {
             width={Math.min(420, stageSize.w)}
             height={stageSize.h}
             walking={game === "installing"}
+            cosmetics={settings?.cosmetics}
+            emote={emote}
           />
+          <div className="emote-dock">
+            {emoteMenu && (
+              <div className="emote-menu">
+                {EMOTES.map((e) => (
+                  <button
+                    key={e.kind}
+                    onClick={() => {
+                      setEmote((cur) => ({ kind: e.kind, n: (cur?.n ?? 0) + 1 }));
+                      setEmoteMenu(false);
+                    }}
+                  >
+                    <span>{e.icon}</span>
+                    {e.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className="hud square emote-btn" title="Эмоции" onClick={() => setEmoteMenu((v) => !v)}>
+              😀
+            </button>
+          </div>
         </main>
 
         <div className="right">
@@ -253,6 +279,8 @@ export default function App() {
         <SkinPanel
           account={account}
           skin={skin}
+          cosmetics={settings?.cosmetics ?? []}
+          onCosmetics={(c) => settings && updateSettings({ ...settings, cosmetics: c })}
           onChanged={(a) => (a ? setAccounts(a) : reloadSkin())}
           onAccounts={() => setModal("accounts")}
           onClose={close}

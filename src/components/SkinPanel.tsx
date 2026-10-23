@@ -2,16 +2,19 @@ import { useRef, useState } from "react";
 import { api, errorText, type Account, type Accounts, type Skin } from "../lib/api";
 import Modal from "./Modal";
 import SkinViewer from "./SkinViewer";
+import { COSMETICS, toggleCosmetic } from "../lib/cosmetics";
 
 type Props = {
   account: Account | null;
   skin: Skin | null;
+  cosmetics: string[];
+  onCosmetics: (c: string[]) => void;
   onChanged: (a?: Accounts) => void;
   onAccounts: () => void;
   onClose: () => void;
 };
 
-export default function SkinPanel({ account, skin, onChanged, onAccounts, onClose }: Props) {
+export default function SkinPanel({ account, skin, cosmetics, onCosmetics, onChanged, onAccounts, onClose }: Props) {
   const file = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<{ url: string; bytes: number[] } | null>(null);
   const [slim, setSlim] = useState(skin?.slim ?? false);
@@ -65,6 +68,7 @@ export default function SkinPanel({ account, skin, onChanged, onAccounts, onClos
             slim={preview ? slim : skin?.slim ?? false}
             width={280}
             height={380}
+            cosmetics={cosmetics}
           />
         </div>
         <div className="skin-side">
@@ -104,6 +108,21 @@ export default function SkinPanel({ account, skin, onChanged, onAccounts, onClos
               )}
             </>
           )}
+          <div className="field">
+            <span>Косметика (видна в лаунчере)</span>
+            <div className="cosmetic-grid">
+              {COSMETICS.map((c) => (
+                <button
+                  key={c.id}
+                  className={cosmetics.includes(c.id) ? "cosmetic active" : "cosmetic"}
+                  onClick={() => onCosmetics(toggleCosmetic(cosmetics, c.id))}
+                >
+                  <span>{c.icon}</span>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
           {status && <p className="notice">{status}</p>}
           {error && <p className="error-text">{error}</p>}
         </div>

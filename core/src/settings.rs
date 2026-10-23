@@ -27,6 +27,8 @@ pub struct Settings {
     /// Background blur in pixels, 0–20.
     pub bg_blur: u8,
     pub particles: bool,
+    /// Cosmetics worn by the model in the launcher.
+    pub cosmetics: Vec<String>,
 }
 
 impl Default for Settings {
@@ -45,6 +47,7 @@ impl Default for Settings {
             bg_dim: 45,
             bg_blur: 3,
             particles: true,
+            cosmetics: Vec::new(),
         }
     }
 }

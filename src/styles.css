@@ -348,3 +348,27 @@ input[type="range"] { accent-color: var(--accent); }
   display: grid; place-items: center; color: var(--muted); font-size: 12px;
 }
 .bg-controls { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+
+/* emotes */
+.emote-dock { position: absolute; right: 8px; bottom: 34px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 2; }
+.emote-btn { font-size: 26px; height: 56px; width: 56px; }
+.emote-menu {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px;
+  background: rgba(23, 20, 33, 0.95); border: 3px solid #0a0910; border-radius: 8px; animation: rise-in 0.15s both;
+}
+.emote-menu button {
+  display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 0; border-radius: 6px;
+  background: #2b2838; font-weight: 700; font-size: 13px; text-align: left; white-space: nowrap;
+}
+.emote-menu button:hover { background: var(--accent); }
+.emote-menu button span { font-size: 18px; }
+
+/* cosmetics */
+.cosmetic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cosmetic {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px;
+  border-radius: 8px; border: 2px solid var(--line); background: var(--panel-2); font-size: 12px; font-weight: 600;
+}
+.cosmetic span { font-size: 22px; }
+.cosmetic:hover { border-color: var(--panel-3); }
+.cosmetic.active { border-color: var(--accent); background: rgba(139, 92, 246, 0.2); }

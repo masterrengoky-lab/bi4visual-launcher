@@ -1,12 +1,23 @@
 import { useEffect, useRef } from "react";
 import { NameTagObject, SkinViewer as Viewer } from "skinview3d";
 import { defaultSkin } from "../lib/defaultSkin";
-import { LivelyAnimation } from "../lib/livelyAnimation";
+import { LivelyAnimation, type EmoteKind } from "../lib/livelyAnimation";
+import { animateCosmetics, applyCosmetics } from "../lib/cosmetics";
 
-type Props = { skin: string | null; slim: boolean; name?: string; width: number; height: number; walking?: boolean };
+type Props = {
+  skin: string | null;
+  slim: boolean;
+  name?: string;
+  width: number;
+  height: number;
+  walking?: boolean;
+  cosmetics?: string[];
+  /** Change `n` to play the emote again. */
+  emote?: { kind: EmoteKind; n: number } | null;
+};
 
 /** Animated 3D player model. Follows the mouse; click to make it wave, jump or spin. Drag to turn it. */
-export default function SkinViewer({ skin, slim, name, width, height, walking }: Props) {
+export default function SkinViewer({ skin, slim, name, width, height, walking, cosmetics, emote }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const viewer = useRef<Viewer | null>(null);
   const anim = useRef(new LivelyAnimation());
@@ -20,6 +31,7 @@ export default function SkinViewer({ skin, slim, name, width, height, walking }:
     v.globalLight.intensity = 2.4;
     v.cameraLight.intensity = 0.9;
     v.animation = anim.current;
+    anim.current.onFrame = (t) => animateCosmetics(v, t);
     viewer.current = v;
 
     const onMove = (e: MouseEvent) => {
@@ -56,6 +68,15 @@ export default function SkinViewer({ skin, slim, name, width, height, walking }:
   useEffect(() => {
     anim.current.walking = !!walking;
   }, [walking]);
+
+  const cosmeticsKey = (cosmetics ?? []).join(",");
+  useEffect(() => {
+    if (viewer.current) applyCosmetics(viewer.current, cosmetics ?? []);
+  }, [cosmeticsKey]);
+
+  useEffect(() => {
+    if (emote) anim.current.play(emote.kind);
+  }, [emote?.n]);
 
   useEffect(() => {
     const v = viewer.current;

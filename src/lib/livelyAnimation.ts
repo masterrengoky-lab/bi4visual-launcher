@@ -1,6 +1,20 @@
 import { PlayerAnimation, type PlayerObject } from "skinview3d";
 
-type Action = { kind: "wave" | "jump" | "spin"; start: number };
+export type EmoteKind = "wave" | "jump" | "spin" | "dance" | "dab" | "sit" | "bow" | "cheer";
+type Action = { kind: EmoteKind; start: number };
+
+export const EMOTES: { kind: EmoteKind; name: string; icon: string }[] = [
+  { kind: "wave", name: "Привет", icon: "👋" },
+  { kind: "dance", name: "Танец", icon: "🕺" },
+  { kind: "dab", name: "Дэб", icon: "😎" },
+  { kind: "cheer", name: "Ура", icon: "🙌" },
+  { kind: "bow", name: "Поклон", icon: "🙇" },
+  { kind: "sit", name: "Сесть", icon: "🪑" },
+  { kind: "jump", name: "Прыжок", icon: "⬆️" },
+  { kind: "spin", name: "Кружиться", icon: "🌀" },
+];
+
+const LENGTH: Record<EmoteKind, number> = { wave: 2.2, jump: 0.8, spin: 1.0, dance: 4.2, dab: 2.0, sit: 4.5, bow: 2.0, cheer: 2.6 };
 
 /**
  * Idle animation that feels alive: breathing, swaying arms, head that follows
@@ -11,6 +25,8 @@ export class LivelyAnimation extends PlayerAnimation {
   /** Where the mouse is, -1…1 on each axis relative to the model. */
   target = { x: 0, y: 0 };
   walking = false;
+  /** Called every frame with the animation time, for cosmetics. */
+  onFrame?: (t: number) => void;
   private look = { x: 0, y: 0 };
   private lastMouse = 0;
   private action: Action | null = null;
@@ -21,8 +37,8 @@ export class LivelyAnimation extends PlayerAnimation {
     this.lastMouse = this.progress;
   }
 
-  play(kind?: Action["kind"]) {
-    const kinds: Action["kind"][] = ["wave", "jump", "spin"];
+  play(kind?: EmoteKind) {
+    const kinds: EmoteKind[] = ["wave", "jump", "spin"];
     this.action = { kind: kind ?? kinds[Math.floor(Math.random() * kinds.length)], start: this.progress };
   }
 
@@ -72,21 +88,21 @@ export class LivelyAnimation extends PlayerAnimation {
     }
 
     if (this.action) {
-      const a = (t - this.action.start) / 1.0; // in seconds of animation time
+      const a = t - this.action.start;
+      const len = LENGTH[this.action.kind];
+      // ease in and out of the pose
+      const k = Math.max(0, Math.min(1, a * 4, (len - a) * 4));
+      const mix = (from: number, to: number) => from + (to - from) * k;
       switch (this.action.kind) {
-        case "wave": {
-          if (a > 2.2) break;
-          const up = Math.min(1, a * 4, (2.2 - a) * 4);
-          s.rightArm.rotation.z = -0.06 - up * 2.5 - Math.sin(a * 14) * 0.25 * up;
-          s.rightArm.rotation.x = 0;
-          s.head.rotation.z = Math.sin(a * 7) * 0.06 * up;
+        case "wave":
+          s.rightArm.rotation.z = mix(s.rightArm.rotation.z, -2.6 - Math.sin(a * 14) * 0.25);
+          s.rightArm.rotation.x = mix(s.rightArm.rotation.x, 0);
+          s.head.rotation.z = Math.sin(a * 7) * 0.06 * k;
           break;
-        }
         case "jump": {
-          if (a > 0.8) break;
-          const k = a / 0.8;
-          player.position.y += Math.sin(k * Math.PI) * 4;
-          const tuck = Math.sin(k * Math.PI);
+          const p = Math.min(1, a / len);
+          const tuck = Math.sin(p * Math.PI);
+          player.position.y += tuck * 4;
           s.leftArm.rotation.z = 0.06 + tuck * 0.9;
           s.rightArm.rotation.z = -0.06 - tuck * 0.9;
           s.leftLeg.rotation.x = tuck * 0.3;
@@ -94,15 +110,62 @@ export class LivelyAnimation extends PlayerAnimation {
           break;
         }
         case "spin": {
-          if (a > 1.0) break;
-          const e = 1 - Math.pow(1 - a, 3);
-          player.rotation.y += e * Math.PI * 2;
-          player.position.y += Math.sin(a * Math.PI) * 1.5;
+          const p = Math.min(1, a / len);
+          player.rotation.y += (1 - Math.pow(1 - p, 3)) * Math.PI * 2;
+          player.position.y += Math.sin(p * Math.PI) * 1.5;
           break;
         }
+        case "dance": {
+          const b = a * 9;
+          const beat = Math.sin(b);
+          player.position.y += Math.abs(Math.sin(b)) * 1.2 * k;
+          player.rotation.y = mix(player.rotation.y, 0.35 + Math.sin(a * 2.2) * 0.6);
+          s.body.rotation.z = beat * 0.08 * k;
+          s.head.rotation.z = -beat * 0.15 * k;
+          s.rightArm.rotation.z = mix(s.rightArm.rotation.z, beat > 0 ? -2.5 : -0.4);
+          s.leftArm.rotation.z = mix(s.leftArm.rotation.z, beat > 0 ? 0.4 : 2.5);
+          s.rightLeg.rotation.x = Math.sin(b) * 0.35 * k;
+          s.leftLeg.rotation.x = -Math.sin(b) * 0.35 * k;
+          break;
+        }
+        case "dab":
+          s.rightArm.rotation.z = mix(s.rightArm.rotation.z, -2.3);
+          s.rightArm.rotation.x = mix(s.rightArm.rotation.x, -0.2);
+          s.leftArm.rotation.x = mix(s.leftArm.rotation.x, -1.6);
+          s.leftArm.rotation.z = mix(s.leftArm.rotation.z, -0.9);
+          s.head.rotation.x = mix(s.head.rotation.x, 0.55);
+          s.head.rotation.y = mix(s.head.rotation.y, 0.6);
+          break;
+        case "cheer": {
+          const shake = Math.sin(a * 16) * 0.2;
+          s.rightArm.rotation.z = mix(s.rightArm.rotation.z, -2.9 + shake);
+          s.leftArm.rotation.z = mix(s.leftArm.rotation.z, 2.9 - shake);
+          player.position.y += Math.abs(Math.sin(a * 5)) * 2 * k;
+          s.head.rotation.x = mix(s.head.rotation.x, -0.3);
+          break;
+        }
+        case "bow":
+          player.rotation.x = mix(0, 0.45);
+          s.head.rotation.x = mix(s.head.rotation.x, 0.3);
+          s.rightArm.rotation.x = mix(s.rightArm.rotation.x, 0.25);
+          s.leftArm.rotation.x = mix(s.leftArm.rotation.x, -0.6);
+          s.leftArm.rotation.z = mix(s.leftArm.rotation.z, -0.5);
+          break;
+        case "sit":
+          s.rightLeg.rotation.x = mix(0, -1.5);
+          s.leftLeg.rotation.x = mix(0, -1.5);
+          s.rightArm.rotation.x = mix(s.rightArm.rotation.x, -0.5);
+          s.leftArm.rotation.x = mix(s.leftArm.rotation.x, -0.5);
+          player.position.y -= 6 * k;
+          break;
       }
-      const length = { wave: 2.2, jump: 0.8, spin: 1.0 }[this.action.kind];
-      if (a > length) this.action = null;
+      if (a > len) {
+        this.action = null;
+        player.rotation.x = 0;
+        s.body.rotation.z = 0;
+        s.head.rotation.z = 0;
+      }
     }
+    this.onFrame?.(t);
   }
 }
