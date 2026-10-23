@@ -42,7 +42,7 @@ export type Hit = {
 };
 export type SearchResult = { hits: Hit[]; total_hits: number };
 
-export type Account = { id: string; kind: "offline" | "microsoft"; name: string; uuid: string };
+export type Account = { id: string; kind: "offline" | "microsoft"; name: string; uuid: string; custom_skin: boolean };
 export type Accounts = { accounts: Account[]; selected: string | null; microsoft_available: boolean };
 export type Skin = { data_url: string; slim: boolean };
 export type GameVersions = { latest: string; versions: { id: string; kind: string }[] };
@@ -82,7 +82,8 @@ export const api = {
   msStart: () => invoke<DeviceCode>("ms_login_start"),
   msFinish: () => invoke<Accounts>("ms_login_finish"),
   skin: (id: string) => invoke<Skin | null>("account_skin", { id }),
-  uploadSkin: (id: string, png: number[], slim: boolean) => invoke<void>("account_upload_skin", { id, png, slim }),
+  uploadSkin: (id: string, png: number[], slim: boolean) => invoke<Accounts>("account_upload_skin", { id, png, slim }),
+  resetSkin: (id: string) => invoke<Accounts>("account_reset_skin", { id }),
 
   play: () => invoke<void>("play"),
 };

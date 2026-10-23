@@ -27,6 +27,9 @@ pub struct Account {
     pub expires_at: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub xuid: Option<String>,
+    /// Offline accounts only: a custom skin is saved, and whether it uses slim arms.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_skin_slim: Option<bool>,
 }
 
 /// What the UI sees: no tokens.
@@ -36,11 +39,18 @@ pub struct AccountView {
     pub kind: AccountKind,
     pub name: String,
     pub uuid: String,
+    pub custom_skin: bool,
 }
 
 impl From<&Account> for AccountView {
     fn from(a: &Account) -> Self {
-        Self { id: a.id.clone(), kind: a.kind.clone(), name: a.name.clone(), uuid: a.uuid.clone() }
+        Self {
+            id: a.id.clone(),
+            kind: a.kind.clone(),
+            name: a.name.clone(),
+            uuid: a.uuid.clone(),
+            custom_skin: a.custom_skin_slim.is_some(),
+        }
     }
 }
 
@@ -75,7 +85,8 @@ impl AccountStore {
     pub fn upsert(&mut self, acc: Account) {
         if let Some(old) = self.accounts.iter_mut().find(|a| a.kind == acc.kind && a.uuid == acc.uuid) {
             let id = old.id.clone();
-            *old = Account { id: id.clone(), ..acc };
+            let custom_skin_slim = acc.custom_skin_slim.or(old.custom_skin_slim);
+            *old = Account { id: id.clone(), custom_skin_slim, ..acc };
             self.selected = Some(id);
         } else {
             self.selected = Some(acc.id.clone());
@@ -118,6 +129,7 @@ pub fn offline(name: &str) -> Result<Account> {
         refresh_token: None,
         expires_at: None,
         xuid: None,
+        custom_skin_slim: None,
     })
 }
 

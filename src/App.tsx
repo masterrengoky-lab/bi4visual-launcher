@@ -80,7 +80,7 @@ export default function App() {
   const reloadSkin = useCallback(() => {
     if (!account) return setSkin(null);
     api.skin(account.id).then(setSkin, () => setSkin(null));
-  }, [account?.id]);
+  }, [account?.id, account?.custom_skin, accounts]);
   useEffect(reloadSkin, [reloadSkin]);
 
   async function play() {
@@ -251,7 +251,13 @@ export default function App() {
         />
       )}
       {modal === "skin" && (
-        <SkinPanel account={account} skin={skin} onChanged={reloadSkin} onAccounts={() => setModal("accounts")} onClose={close} />
+        <SkinPanel
+          account={account}
+          skin={skin}
+          onChanged={(a) => (a ? setAccounts(a) : reloadSkin())}
+          onAccounts={() => setModal("accounts")}
+          onClose={close}
+        />
       )}
     </div>
   );

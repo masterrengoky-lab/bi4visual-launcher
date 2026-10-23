@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { placeholderSkin } from "./SkinViewer";
+import { defaultSkin } from "../lib/defaultSkin";
 
 /** Flat front view of a skin (like a paper doll), drawn from the texture. */
 export default function SkinFront({ skin, slim, className }: { skin: string | null; slim: boolean; className?: string }) {
@@ -38,7 +38,7 @@ export default function SkinFront({ skin, slim, className }: { skin: string | nu
         part(4, 52, 4, 12, ox + arm + 4, 20);
       }
     };
-    img.src = skin ?? placeholderSkin().toDataURL();
+    img.src = skin ?? defaultSkin().toDataURL();
   }, [skin, slim]);
 
   return <canvas ref={canvas} className={className} width={16 * 8} height={32 * 8} style={{ imageRendering: "pixelated" }} />;

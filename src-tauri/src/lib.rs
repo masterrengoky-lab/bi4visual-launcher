@@ -329,16 +329,40 @@ async fn account_skin(st: State<'_, AppState>, id: String) -> Res<Option<skins::
     skins::skin_for(&st.client, &st.paths, acc).await.map_err(err)
 }
 
+/// Microsoft accounts upload to Mojang; offline accounts keep the skin locally.
 #[tauri::command]
-async fn account_upload_skin(st: State<'_, AppState>, id: String, png: Vec<u8>, slim: bool) -> Res<()> {
+async fn account_upload_skin(st: State<'_, AppState>, id: String, png: Vec<u8>, slim: bool) -> Res<AccountsResponse> {
     let mut store = AccountStore::load(&st.paths);
     let mut acc = store.accounts.iter().find(|a| a.id == id).cloned().ok_or("Аккаунт не найден")?;
+    if acc.kind == accounts::AccountKind::Offline {
+        skins::save_custom(&st.paths, &acc, &png).map_err(err)?;
+        acc.custom_skin_slim = Some(slim);
+        if let Some(a) = store.accounts.iter_mut().find(|a| a.id == id) {
+            *a = acc;
+        }
+        store.save(&st.paths).map_err(err)?;
+        return Ok(accounts_response(&store));
+    }
     if let Some(fresh) = microsoft::refresh_if_needed(&st.client, &acc).await.map_err(err)? {
-        store.upsert(fresh.clone());
+        if let Some(a) = store.accounts.iter_mut().find(|a| a.id == id) {
+            *a = fresh.clone();
+        }
         store.save(&st.paths).map_err(err)?;
         acc = fresh;
     }
-    skins::upload(&st.client, &acc, png, slim).await.map_err(err)
+    skins::upload(&st.client, &acc, png, slim).await.map_err(err)?;
+    Ok(accounts_response(&store))
+}
+
+#[tauri::command]
+fn account_reset_skin(st: State<AppState>, id: String) -> Res<AccountsResponse> {
+    let mut store = AccountStore::load(&st.paths);
+    if let Some(a) = store.accounts.iter_mut().find(|a| a.id == id) {
+        skins::remove_custom(&st.paths, a);
+        a.custom_skin_slim = None;
+    }
+    store.save(&st.paths).map_err(err)?;
+    Ok(accounts_response(&store))
 }
 
 // ---------- play ----------
@@ -369,6 +393,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         };
         inst.last_played = Some(instances::now());
         inst.save(&st.paths)?;
+        skins::apply_pack(&st.paths, &account, &inst.game_dir(&st.paths))?;
         let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
         Ok((plan, inst.id))
     }
@@ -472,6 +497,7 @@ pub fn run() {
             ms_login_finish,
             account_skin,
             account_upload_skin,
+            account_reset_skin,
             play,
         ])
         .run(tauri::generate_context!())

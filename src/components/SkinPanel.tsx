@@ -1,9 +1,15 @@
 import { useRef, useState } from "react";
-import { api, errorText, type Account, type Skin } from "../lib/api";
+import { api, errorText, type Account, type Accounts, type Skin } from "../lib/api";
 import Modal from "./Modal";
 import SkinViewer from "./SkinViewer";
 
-type Props = { account: Account | null; skin: Skin | null; onChanged: () => void; onAccounts: () => void; onClose: () => void };
+type Props = {
+  account: Account | null;
+  skin: Skin | null;
+  onChanged: (a?: Accounts) => void;
+  onAccounts: () => void;
+  onClose: () => void;
+};
 
 export default function SkinPanel({ account, skin, onChanged, onAccounts, onClose }: Props) {
   const file = useRef<HTMLInputElement>(null);
@@ -19,6 +25,7 @@ export default function SkinPanel({ account, skin, onChanged, onAccounts, onClos
     setStatus(null);
     const buf = new Uint8Array(await f.arrayBuffer());
     setPreview({ url: URL.createObjectURL(f), bytes: Array.from(buf) });
+    if (file.current) file.current.value = "";
   }
 
   async function save() {
@@ -26,10 +33,14 @@ export default function SkinPanel({ account, skin, onChanged, onAccounts, onClos
     setSaving(true);
     setError(null);
     try {
-      await api.uploadSkin(account.id, preview.bytes, slim);
-      setStatus("Скин сохранён. В игре он появится при следующем входе.");
+      const accounts = await api.uploadSkin(account.id, preview.bytes, slim);
+      setStatus(
+        licensed
+          ? "Скин сохранён в аккаунте Microsoft. Его увидят все игроки."
+          : "Скин сохранён. В игре он появится при следующем запуске.",
+      );
       setPreview(null);
-      onChanged();
+      onChanged(accounts);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -37,32 +48,45 @@ export default function SkinPanel({ account, skin, onChanged, onAccounts, onClos
     }
   }
 
+  async function reset() {
+    if (!account) return;
+    onChanged(await api.resetSkin(account.id));
+    setStatus("Вернули стандартный скин.");
+  }
+
   const licensed = account?.kind === "microsoft";
 
   return (
-    <Modal title="Скин" onClose={onClose} wide>
+    <Modal title="Мой скин" onClose={onClose} wide>
       <div className="skin-panel">
         <div className="skin-preview">
-          <SkinViewer skin={preview?.url ?? skin?.data_url ?? null} slim={preview ? slim : skin?.slim ?? false} width={260} height={340} walking />
+          <SkinViewer
+            skin={preview?.url ?? skin?.data_url ?? null}
+            slim={preview ? slim : skin?.slim ?? false}
+            name={account?.name}
+            width={280}
+            height={380}
+          />
         </div>
         <div className="skin-side">
-          {!account && (
+          {!account ? (
             <>
               <p>Сначала добавьте аккаунт.</p>
               <button className="btn primary" onClick={onAccounts}>Аккаунты</button>
             </>
-          )}
-          {account && !licensed && (
-            <p>
-              У аккаунта без пароля в игре стандартный скин Стива или Алекс. Поставить свой скин можно на лицензионном аккаунте Microsoft:
-              он будет виден всем игрокам на любых серверах.
-            </p>
-          )}
-          {licensed && (
+          ) : (
             <>
-              <p>Выберите PNG-файл скина 64×64. Его можно скачать на сайтах со скинами или нарисовать самому.</p>
+              <p>
+                Выберите PNG-файл скина 64×64. Скины можно найти на сайтах вроде namemc.com или minecraftskins.com, либо нарисовать
+                самому.
+              </p>
               <input ref={file} type="file" accept="image/png" hidden onChange={(e) => pick(e.target.files?.[0])} />
-              <button className="btn" onClick={() => file.current?.click()}>Выбрать файл…</button>
+              <div className="row">
+                <button className="btn" onClick={() => file.current?.click()}>Выбрать файл…</button>
+                {!licensed && account.custom_skin && (
+                  <button className="btn" onClick={reset}>Вернуть стандартный</button>
+                )}
+              </div>
               <div className="field">
                 <span>Модель</span>
                 <div className="segmented">
@@ -70,9 +94,15 @@ export default function SkinPanel({ account, skin, onChanged, onAccounts, onClos
                   <button className={slim ? "active" : ""} onClick={() => setSlim(true)}>Тонкие руки</button>
                 </div>
               </div>
-              <button className="btn primary" disabled={!preview || saving} onClick={save}>
+              <button className="mc-btn yellow" disabled={!preview || saving} onClick={save}>
                 {saving ? "Сохраняю…" : "Сохранить скин"}
               </button>
+              {!licensed && (
+                <small>
+                  Без лицензии свой скин в игре видите только вы, а другие игроки со стандартным скином у вас тоже будут выглядеть так.
+                  Чтобы скин видели все, нужен лицензионный аккаунт или скин-система на сервере.
+                </small>
+              )}
             </>
           )}
           {status && <p className="notice">{status}</p>}

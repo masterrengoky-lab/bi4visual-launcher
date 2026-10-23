@@ -194,5 +194,6 @@ async fn minecraft_login(client: &reqwest::Client, ms_token: &str, refresh: Opti
         refresh_token: refresh,
         expires_at: Some(now() + mc.expires_in),
         xuid,
+        custom_skin_slim: None,
     })
 }
