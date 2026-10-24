@@ -20,7 +20,7 @@ public class LevelRendererMixin {
     private void bi4visual$lyrics(CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
-        boolean drawn = Lyrics3D.render((pose, letter, x, y, argb) -> mc.font.drawInBatch(letter, x, y, argb, true,
+        boolean drawn = Lyrics3D.render((pose, letter, x, y, argb, shadow) -> mc.font.drawInBatch(letter, x, y, argb, shadow,
                 pose.last().pose(), buffers, Font.DisplayMode.SEE_THROUGH, 0, Lyrics3D.FULL_BRIGHT), true);
         if (drawn) {
             buffers.endBatch();

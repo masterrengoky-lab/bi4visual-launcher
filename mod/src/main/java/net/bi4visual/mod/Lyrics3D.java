@@ -1,10 +1,8 @@
 package net.bi4visual.mod;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -15,49 +13,58 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 
 /**
- * Lines of the playing song floating in the sky around the player. Each line
- * types itself in letter by letter, drifts up and fades out when the next one starts.
+ * Lines of the playing song floating in front of the player. The text follows
+ * the view with a soft lag, each line types in letter by letter with a glow and
+ * a moving gradient, and the previous line rises and fades as the next one comes.
  */
 public final class Lyrics3D {
     /** Packed light for "lit by sky and block light 15", same as LightTexture.FULL_BRIGHT. */
     public static final int FULL_BRIGHT = 0xF000F0;
-    private static final int TOP = 0xE6CCFF;
-    private static final int BOTTOM = 0x9A66FF;
-    private static final float DISTANCE = 10f;
-    private static final long FADE_IN = 350;
-    private static final long FADE_OUT = 700;
-    private static final long LETTER = 35;
+    private static final int LIGHT = 0xF1E4FF;
+    private static final int DEEP = 0xA77BFF;
+    private static final int GLOW = 0x7A3CF0;
+    private static final float DISTANCE = 14f;
+    /** Blocks between the current line and the one before it. */
+    private static final float LINE_GAP = 1.1f;
+    private static final float PIXEL = 0.06f;
+    private static final long LETTER = 28;
+    private static final long LETTER_IN = 380;
+    private static final long FADE_OUT = 900;
     /** A line with no next one (an instrumental part) goes away after this. */
     private static final long MAX_LIFE = 9000;
 
     private static final class Floating {
         final List<Component> letters = new ArrayList<>();
-        final float yaw;
-        final float pitch;
-        final float roll;
         final long born;
         long dying = Long.MAX_VALUE;
+        /** Lines above this one, animated towards the real count. */
+        float slot;
+        int targetSlot;
+        /** Sideways shift in blocks, so neighbouring pieces do not sit on one spot. */
+        final float side;
 
-        Floating(String text, float yaw, float pitch, float roll, long born) {
+        Floating(String text, long born, float side) {
+            this.side = side;
             text.codePoints().forEach(cp -> letters.add(Component.literal(new String(Character.toChars(cp))).withStyle(ChatFormatting.BOLD)));
-            this.yaw = yaw;
-            this.pitch = pitch;
-            this.roll = roll;
             this.born = born;
         }
     }
 
     private static final List<Floating> shown = new ArrayList<>();
-    private static final Random random = new Random();
     private static String track = "";
     private static int lineIndex = -1;
-    private static int side = 1;
+    private static int pieceIndex = -1;
+    private static int pieceCount;
+    /** Where the text hangs; follows the player's view with a delay. */
+    private static float anchorYaw;
+    private static float anchorPitch;
+    private static long lastFrame;
 
     private Lyrics3D() {}
 
     /** Draws one letter; the game version decides how (see the backend's LevelRendererMixin). */
     public interface Sink {
-        void letter(PoseStack pose, Component letter, float x, float y, int argb);
+        void letter(PoseStack pose, Component letter, float x, float y, int argb, boolean shadow);
     }
 
     /**
@@ -72,34 +79,52 @@ public final class Lyrics3D {
             return false;
         }
         long now = System.currentTimeMillis();
-        // Same rotation the camera builds from the view angles (Camera#setRotation);
-        // taken from the player because the camera's getters differ between versions.
-        Quaternionf camera = new Quaternionf().rotationYXZ(
-                -mc.player.getYRot() * Mth.DEG_TO_RAD, mc.player.getXRot() * Mth.DEG_TO_RAD, 0f);
-        update(NowPlaying.get(), now, mc.player);
+        float dt = lastFrame == 0 ? 1f : Mth.clamp((now - lastFrame) / 1000f, 0f, 0.25f);
+        lastFrame = now;
+        Entity viewer = mc.player;
+        boolean wasEmpty = shown.isEmpty();
+        update(NowPlaying.get(), now);
         if (shown.isEmpty()) {
             return false;
         }
 
+        // Follow the view softly: right in front, a little above the crosshair.
+        float wantYaw = viewer.getYRot();
+        float wantPitch = Mth.clamp(viewer.getXRot() - 6f, -80f, 80f);
+        float k = wasEmpty ? 1f : 1f - (float) Math.exp(-dt * 3.5f);
+        anchorYaw += Mth.wrapDegrees(wantYaw - anchorYaw) * k;
+        anchorPitch += (wantPitch - anchorPitch) * k;
+        float slotK = 1f - (float) Math.exp(-dt * 6f);
+        for (Floating line : shown) {
+            line.slot += (line.targetSlot - line.slot) * slotK;
+        }
+
+        // Same rotation the camera builds from the view angles (Camera#setRotation);
+        // taken from the player because the camera's getters differ between versions.
+        Quaternionf camera = new Quaternionf().rotationYXZ(
+                -viewer.getYRot() * Mth.DEG_TO_RAD, viewer.getXRot() * Mth.DEG_TO_RAD, 0f);
         PoseStack pose = new PoseStack();
         if (applyView) {
             rotate(pose, new Quaternionf(camera).conjugate());
         }
+        Vec3 dir = Vec3.directionFromRotation(anchorPitch, anchorYaw);
         for (Floating line : shown) {
-            draw(line, now, pose, sink, mc.font, camera);
+            draw(line, now, pose, sink, mc.font, camera, dir);
         }
         return true;
     }
 
-    private static void update(NowPlaying.Data np, long now, Entity viewer) {
+    private static void update(NowPlaying.Data np, long now) {
         String key = np == null ? "" : np.title + "\u0000" + np.artist;
         if (!key.equals(track)) {
             track = key;
             lineIndex = -1;
-            fadeAll(now);
             // Show what is playing, also as a sign the mod sees the music.
             if (np != null && !np.title.isBlank()) {
-                spawn("\u266A " + (np.artist.isBlank() ? "" : np.artist + " \u2014 ") + np.title, now, viewer);
+                pieceCount = 0;
+                spawn("\u266A " + (np.artist.isBlank() ? "" : np.artist + " \u2014 ") + np.title, now);
+            } else {
+                fadeAll(now);
             }
         }
         if (np != null && np.lines != null && !np.lines.isEmpty()) {
@@ -108,13 +133,34 @@ public final class Lyrics3D {
             for (int i = 0; i < np.lines.size() && np.lines.get(i).t <= pos; i++) {
                 index = i;
             }
+            String text = index >= 0 ? np.lines.get(index).text : "";
+            List<String> pieces = text == null ? List.of() : pieces(text);
+            int piece = -1;
+            if (!pieces.isEmpty()) {
+                // Spread the pieces over the time until the next line, like the words are sung.
+                long start = np.lines.get(index).t;
+                long next = index + 1 < np.lines.size() ? np.lines.get(index + 1).t : start + 4000;
+                long span = Mth.clamp(next - start, 1200, 7000) * 8 / 10;
+                int words = 0;
+                int total = text.trim().split("\\s+").length;
+                for (int j = 0; j < pieces.size(); j++) {
+                    if (pos - start >= span * words / total) {
+                        piece = j;
+                    }
+                    words += pieces.get(j).split(" ").length;
+                }
+            }
             if (index != lineIndex) {
                 lineIndex = index;
-                fadeAll(now);
-                String text = index >= 0 ? np.lines.get(index).text : "";
-                if (text != null && !text.isBlank()) {
-                    spawn(text.trim(), now, viewer);
+                pieceIndex = -1;
+                pieceCount = 0;
+                if (pieces.isEmpty()) {
+                    fadeAll(now);
                 }
+            }
+            while (pieceIndex < piece) {
+                pieceIndex++;
+                spawn(pieces.get(pieceIndex), now);
             }
         }
         for (Floating line : shown) {
@@ -131,36 +177,53 @@ public final class Lyrics3D {
         }
     }
 
-    private static void spawn(String text, long now, Entity viewer) {
-        // Lines take turns left and right of where the player looks, a bit above the crosshair.
-        side = -side;
-        float yaw = viewer.getYRot() + side * (8f + random.nextFloat() * 22f);
-        float pitch = Mth.clamp(viewer.getXRot() - 6f + (random.nextFloat() - 0.5f) * 14f, -75f, 45f);
-        float roll = (random.nextFloat() - 0.5f) * 10f;
-        shown.add(new Floating(text, yaw, pitch, roll, now));
+    /** Splits a line into pieces of 2-3 words, never leaving one word alone. */
+    static List<String> pieces(String text) {
+        String[] words = text.trim().split("\\s+");
+        List<String> out = new ArrayList<>();
+        if (words.length == 0 || words[0].isEmpty()) {
+            return out;
+        }
+        int i = 0;
+        while (i < words.length) {
+            int left = words.length - i;
+            int take = left <= 3 ? left : (left == 4 ? 2 : 3);
+            out.add(String.join(" ", java.util.Arrays.copyOfRange(words, i, i + take)));
+            i += take;
+        }
+        return out;
+    }
+
+    /** The new piece appears in front; older ones move up a row and fade. */
+    private static void spawn(String text, long now) {
+        for (Floating line : shown) {
+            line.targetSlot++;
+            line.dying = Math.min(line.dying, now + 500);
+        }
+        // Pieces of a line step a little left and right, the first one centred.
+        float side = pieceCount == 0 ? 0f : (pieceCount % 2 == 1 ? 1.4f : -1.4f);
+        pieceCount++;
+        shown.add(new Floating(text, now, side));
         while (shown.size() > 4) {
             shown.remove(0);
         }
     }
 
-    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Quaternionf camera) {
+    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Quaternionf camera, Vec3 dir) {
         long age = now - line.born;
-        float in = Mth.clamp(age / (float) FADE_IN, 0f, 1f);
         float out = line.dying == Long.MAX_VALUE ? 1f : 1f - Mth.clamp((now - line.dying) / (float) FADE_OUT, 0f, 1f);
-        float alpha = easeOut(in) * out;
-        if (alpha < 0.02f) {
+        float outEase = easeInOut(out);
+        if (outEase < 0.01f) {
             return;
         }
 
-        Vec3 dir = Vec3.directionFromRotation(line.pitch, line.yaw);
-        float rise = age / 1000f * 0.12f + (1f - out) * 0.8f;
-        float sway = Mth.sin(age / 900f) * 0.08f;
-
+        float bob = Mth.sin(age / 1300f) * 0.05f;
         pose.pushPose();
-        pose.translate(dir.x * DISTANCE + sway, dir.y * DISTANCE + rise, dir.z * DISTANCE);
+        pose.translate(dir.x * DISTANCE, dir.y * DISTANCE, dir.z * DISTANCE);
         rotate(pose, camera);
-        rotate(pose, Axis.ZP.rotationDegrees(line.roll));
-        float scale = 0.05f * (0.8f + 0.2f * easeOut(in)) * (1f + (1f - out) * 0.15f);
+        // Rows go up in the view, whatever the pitch.
+        pose.translate(line.side, line.slot * LINE_GAP + (1f - outEase) * 0.5f + bob, 0f);
+        float scale = PIXEL * (1f + (1f - outEase) * 0.06f);
         pose.scale(scale, -scale, scale);
 
         int width = 0;
@@ -172,16 +235,47 @@ public final class Lyrics3D {
         for (int i = 0; i < n; i++) {
             Component c = line.letters.get(i);
             int w = font.width(c);
-            float letterIn = Mth.clamp((age - i * LETTER) / 220f, 0f, 1f);
-            int a = (int) (255 * alpha * letterIn);
+            float t = Mth.clamp((age - i * LETTER) / (float) LETTER_IN, 0f, 1f);
+            float alpha = easeOut(t) * outEase;
+            int a = (int) (255 * alpha);
             if (a > 4) {
-                float y = (1f - easeOut(letterIn)) * 5f;
-                int rgb = lerpColor(TOP, BOTTOM, n <= 1 ? 0f : i / (float) (n - 1));
-                sink.letter(pose, c, x, y, (a << 24) | rgb);
+                float pop = 0.6f + 0.4f * easeOutBack(t);
+                float y = (1f - easeOut(t)) * 6f;
+                // A soft wave of colour running along the line.
+                float wave = 0.5f + 0.5f * Mth.sin(i * 0.45f - age / 450f);
+                int rgb = lerpColor(LIGHT, DEEP, wave);
+
+                pose.pushPose();
+                pose.translate(x + w / 2f, y + 4f, 0f);
+                pose.scale(pop, pop, 1f);
+                pose.translate(-w / 2f, -4f, 0f);
+                int glow = ((int) (a * 0.22f) << 24) | GLOW;
+                if (a * 0.22f > 4) {
+                    for (float[] o : GLOW_OFFSETS) {
+                        sink.letter(pose, c, o[0], o[1], glow, false);
+                    }
+                }
+                sink.letter(pose, c, 0f, 0f, (a << 24) | rgb, false);
+                pose.popPose();
             }
             x += w;
         }
         pose.popPose();
+    }
+
+    private static final float[][] GLOW_OFFSETS = {
+        {-0.8f, 0f}, {0.8f, 0f}, {0f, -0.8f}, {0f, 0.8f},
+        {-0.6f, -0.6f}, {0.6f, -0.6f}, {-0.6f, 0.6f}, {0.6f, 0.6f},
+    };
+
+    private static float easeInOut(float t) {
+        return t * t * (3f - 2f * t);
+    }
+
+    private static float easeOutBack(float t) {
+        float c = 1.4f;
+        float u = t - 1f;
+        return 1f + (c + 1f) * u * u * u + c * u * u;
     }
 
     /** PoseStack#mulPose(Quaternionf) is gone in 26.3; text needs no normals, so turn the matrix only. */

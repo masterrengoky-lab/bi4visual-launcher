@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class LevelRendererMixin {
     @Inject(method = "submitFeatures", at = @At("TAIL"), require = 0)
     private void bi4visual$lyrics(LevelRenderState state, SubmitNodeCollector collector, boolean outlines, CallbackInfo ci) {
-        Lyrics3D.render((pose, letter, x, y, argb) -> collector.submitText(pose, x, y, letter.getVisualOrderText(), true,
+        Lyrics3D.render((pose, letter, x, y, argb, shadow) -> collector.submitText(pose, x, y, letter.getVisualOrderText(), shadow,
                 Font.DisplayMode.SEE_THROUGH, Lyrics3D.FULL_BRIGHT, argb, 0, 0), false);
     }
 }
