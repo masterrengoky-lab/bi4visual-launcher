@@ -83,7 +83,7 @@ public final class Lyrics3D {
 
         PoseStack pose = new PoseStack();
         if (applyView) {
-            pose.mulPose(new Quaternionf(camera).conjugate());
+            rotate(pose, new Quaternionf(camera).conjugate());
         }
         for (Floating line : shown) {
             draw(line, now, pose, sink, mc.font, camera);
@@ -154,8 +154,8 @@ public final class Lyrics3D {
 
         pose.pushPose();
         pose.translate(dir.x * DISTANCE + sway, dir.y * DISTANCE + rise, dir.z * DISTANCE);
-        pose.mulPose(camera);
-        pose.mulPose(Axis.ZP.rotationDegrees(line.roll));
+        rotate(pose, camera);
+        rotate(pose, Axis.ZP.rotationDegrees(line.roll));
         float scale = 0.05f * (0.8f + 0.2f * easeOut(in)) * (1f + (1f - out) * 0.15f);
         pose.scale(scale, -scale, scale);
 
@@ -178,6 +178,11 @@ public final class Lyrics3D {
             x += w;
         }
         pose.popPose();
+    }
+
+    /** PoseStack#mulPose(Quaternionf) is gone in 26.3; text needs no normals, so turn the matrix only. */
+    private static void rotate(PoseStack pose, Quaternionf q) {
+        pose.last().pose().rotate(q);
     }
 
     private static float easeOut(float t) {
