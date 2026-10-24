@@ -124,6 +124,10 @@ fn clean_title(title: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+pub fn has_mod(bundled: &Path, game_version: &str) -> bool {
+    bundled.join(format!("bi4visual-{game_version}.jar")).is_file()
+}
+
 /// Puts the bundled bi4visual mod for `game_version` into the instance's
 /// mods folder, replacing an older copy. `bundled` holds `bi4visual-<mc>.jar`.
 /// Returns false when there is no build of the mod for that version.

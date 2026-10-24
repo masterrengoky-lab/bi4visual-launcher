@@ -52,7 +52,12 @@ public final class NowPlaying {
                     String stamp = Files.getLastModifiedTime(file).toMillis() + ":" + Files.size(file);
                     if (!stamp.equals(seen)) {
                         try (Reader r = Files.newBufferedReader(file)) {
-                            current = GSON.fromJson(r, Data.class);
+                            Data next = GSON.fromJson(r, Data.class);
+                            Data prev = current;
+                            if (next != null && (prev == null || !next.title.equals(prev.title))) {
+                                System.out.println("[bi4visual] Вижу трек: " + next.artist + " - " + next.title + ", строк текста: " + (next.lines == null ? 0 : next.lines.size()));
+                            }
+                            current = next;
                         }
                         seen = stamp;
                     }

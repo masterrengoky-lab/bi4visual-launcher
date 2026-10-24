@@ -97,6 +97,10 @@ public final class Lyrics3D {
             track = key;
             lineIndex = -1;
             fadeAll(now);
+            // Show what is playing, also as a sign the mod sees the music.
+            if (np != null && !np.title.isBlank()) {
+                spawn("\u266A " + (np.artist.isBlank() ? "" : np.artist + " \u2014 ") + np.title, now, viewer);
+            }
         }
         if (np != null && np.lines != null && !np.lines.isEmpty()) {
             long pos = np.position(now);

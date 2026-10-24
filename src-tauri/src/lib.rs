@@ -387,8 +387,23 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
 
     let _ = app.emit("game-state", GameState { state: "installing", code: None });
     let bundled_mods = app.path().resource_dir().map(|d| d.join("mods")).unwrap_or_default();
+    let log = {
+        let app = app.clone();
+        move |line: String| {
+            let _ = app.emit("game-log", format!("[bi4visual] {line}"));
+        }
+    };
     let result: anyhow::Result<(launch::LaunchPlan, String, bool)> = async {
         let mut inst = ensure_default_instance(&st).await?;
+        // The lyrics live in a Fabric mod: a plain build of a supported version
+        // is moved to Fabric, which plays the same without other mods.
+        if settings.lyrics && inst.loader == Loader::Vanilla && lyrics::has_mod(&bundled_mods, &inst.game_version) {
+            inst.loader = Loader::Fabric;
+            inst.loader_version = None;
+            inst.version_id = None;
+            inst.save(&st.paths)?;
+            log(format!("Сборка {} переведена на Fabric, чтобы показывать текст песен", inst.name));
+        }
         let version = instances::ensure_ready(&st.client, &st.paths, &mut inst, &progress).await?;
         let major = VersionJson::load_resolved(&st.paths, &version)?.java_major();
         let java_bin = match settings.java_path.clone().filter(|p| !p.trim().is_empty()) {
@@ -401,6 +416,13 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         let lyrics_mod = inst.loader == Loader::Fabric
             && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, settings.lyrics)?;
         let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
+        if settings.lyrics {
+            log(if lyrics_mod {
+                format!("Мод текста песен установлен ({} {})", inst.game_version, "Fabric")
+            } else {
+                format!("Текст песен не будет показан: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
+            });
+        }
         Ok((plan, inst.id, lyrics_mod))
     }
     .await;
@@ -448,7 +470,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
 
     let stop_media = Arc::new(AtomicBool::new(false));
     if lyrics_mod {
-        tokio::spawn(media::watch(st.client.clone(), plan.game_dir.clone(), stop_media.clone()));
+        tokio::spawn(media::watch(st.client.clone(), plan.game_dir.clone(), stop_media.clone(), log.clone()));
     }
 
     // Wait in the background so the command returns right away; the lock lives until exit.

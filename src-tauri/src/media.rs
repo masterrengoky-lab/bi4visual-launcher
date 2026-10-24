@@ -13,7 +13,8 @@ pub struct Track {
     pub title: String,
     pub artist: String,
     pub playing: bool,
-    pub position_ms: u64,
+    /// None when the player does not report where in the track it is.
+    pub position_ms: Option<u64>,
     pub duration_ms: Option<u64>,
 }
 
@@ -22,29 +23,66 @@ pub fn now_ms() -> u64 {
 }
 
 /// Runs until `stop` is set, then removes the file.
-pub async fn watch(client: reqwest::Client, game_dir: PathBuf, stop: Arc<AtomicBool>) {
+/// `log` gets a line for each new track, so the launcher log shows what was found.
+pub async fn watch(client: reqwest::Client, game_dir: PathBuf, stop: Arc<AtomicBool>, log: impl Fn(String)) {
     let mut np = NowPlaying::default();
     let mut written = false;
+    let mut silent_rounds = 0u32;
+    // Some players (Yandex Music among them) report no position or a frozen one;
+    // then the clock runs from the moment the track was first seen.
+    let mut last_reported: Option<u64> = None;
+    let mut frozen_rounds = 0u32;
     while !stop.load(Ordering::Relaxed) {
         let track = tokio::task::spawn_blocking(current).await.ok().flatten();
         let mut changed = false;
         match track {
             Some(t) if !t.title.is_empty() => {
+                silent_rounds = 0;
                 if t.title != np.title || t.artist != np.artist {
-                    let lines = lyrics::fetch(&client, &t.title, &t.artist, t.duration_ms).await.unwrap_or_default();
+                    let lines = match lyrics::fetch(&client, &t.title, &t.artist, t.duration_ms).await {
+                        Ok(lines) => {
+                            log(if lines.is_empty() {
+                                format!("Играет «{} — {}», но в базе LRCLIB нет синхронного текста", t.artist, t.title)
+                            } else {
+                                format!("Играет «{} — {}», текст найден: {} строк", t.artist, t.title, lines.len())
+                            });
+                            lines
+                        }
+                        Err(e) => {
+                            log(format!("Играет «{} — {}», не удалось скачать текст: {e}", t.artist, t.title));
+                            Vec::new()
+                        }
+                    };
                     np = NowPlaying { title: t.title.clone(), artist: t.artist.clone(), lines, ..Default::default() };
+                    np.updated_at_ms = now_ms();
+                    last_reported = None;
+                    frozen_rounds = 0;
                     changed = true;
                 }
+                if t.playing && t.position_ms.is_some() && t.position_ms == last_reported {
+                    frozen_rounds += 1;
+                } else if t.position_ms != last_reported {
+                    frozen_rounds = 0;
+                }
+                last_reported = t.position_ms;
+                let reported = t.position_ms.filter(|_| frozen_rounds < 6);
+
                 // Rewrite only on pause/play or a seek, the mod advances the clock itself.
-                let predicted = if np.playing { np.position_ms + now_ms().saturating_sub(np.updated_at_ms) } else { np.position_ms };
-                if changed || t.playing != np.playing || predicted.abs_diff(t.position_ms) > 1500 {
+                let now = now_ms();
+                let predicted = if np.playing { np.position_ms + now.saturating_sub(np.updated_at_ms) } else { np.position_ms };
+                let seek = reported.is_some_and(|p| predicted.abs_diff(p) > 1500);
+                if changed || t.playing != np.playing || seek {
+                    np.position_ms = reported.unwrap_or(predicted);
                     np.playing = t.playing;
-                    np.position_ms = t.position_ms;
-                    np.updated_at_ms = now_ms();
+                    np.updated_at_ms = now;
                     changed = true;
                 }
             }
             _ => {
+                silent_rounds += 1;
+                if silent_rounds == 20 {
+                    log("Не вижу играющей музыки. Нужен плеер, который показывает трек в регуляторе громкости Windows".into());
+                }
                 if written {
                     lyrics::clear(&game_dir);
                     written = false;
@@ -80,7 +118,14 @@ fn current() -> Option<Track> {
     let pos = timeline.Position().ok()?.Duration.max(0) as u64 / 10_000;
     let end = timeline.EndTime().ok().map(|e| e.Duration.max(0) as u64 / 10_000).filter(|&e| e > 0);
     let updated = timeline.LastUpdatedTime().ok()?.UniversalTime / 10_000 - 11_644_473_600_000;
-    let position_ms = if playing && updated > 0 { pos + now_ms().saturating_sub(updated as u64) } else { pos };
+    // A player without timeline support leaves both the position and the end at zero.
+    let position_ms = if pos == 0 && end.is_none() {
+        None
+    } else if playing && updated > 0 {
+        Some(pos + now_ms().saturating_sub(updated as u64))
+    } else {
+        Some(pos)
+    };
     Some(Track { title, artist, playing, position_ms, duration_ms: end })
 }
 
