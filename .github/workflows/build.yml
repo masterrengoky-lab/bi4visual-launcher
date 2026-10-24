@@ -62,8 +62,10 @@ jobs:
           done
           echo "::error::jars: $(find ~/.gradle .gradle -name '*.jar' -size +5M 2>/dev/null | grep -i minecraft | head -8 | tr '\n' ' ')"
           if [ -n "$jar" ]; then
-          info=$( { echo "jar: $jar"; unzip -l "$jar" | grep -oE "net/minecraft/client/renderer/[A-Za-z]*(Buffer|Source|Submit|Node|Collector)[A-Za-z$]*\.class" | sort -u | head -40; javap -cp "$jar" net.minecraft.client.gui.Font | grep -i "draw\|submit" ; } | sed ':a;N;$!ba;s/\n/%0A/g')
-          echo "::error::$info"
+          for c in net.minecraft.client.gui.Font net.minecraft.client.renderer.RenderBuffers net.minecraft.client.renderer.SubmitNodeCollector net.minecraft.client.renderer.OrderedSubmitNodeCollector net.minecraft.client.renderer.LevelRenderer net.minecraft.client.renderer.SubmitNodeStorage; do
+            out=$(javap -p -cp "$jar" $c 2>&1 | grep -iE "class|interface|submit|text|draw|render|Source|Collector|Storage|Font\$" | grep -v "lambda" | head -60 | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error::$out"
+          done
           fi
           grep -E "error:|What went wrong|Could not|> |requires|unsupported" -A2 build.log | head -8 | sed 's/^/::error::/'
       - run: |
