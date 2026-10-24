@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
@@ -73,7 +72,10 @@ public final class Lyrics3D {
             return false;
         }
         long now = System.currentTimeMillis();
-        Camera camera = mc.gameRenderer.getMainCamera();
+        // Same rotation the camera builds from the view angles (Camera#setRotation);
+        // taken from the player because the camera's getters differ between versions.
+        Quaternionf camera = new Quaternionf().rotationYXZ(
+                -mc.player.getYRot() * Mth.DEG_TO_RAD, mc.player.getXRot() * Mth.DEG_TO_RAD, 0f);
         update(NowPlaying.get(), now, mc.player);
         if (shown.isEmpty()) {
             return false;
@@ -81,7 +83,7 @@ public final class Lyrics3D {
 
         PoseStack pose = new PoseStack();
         if (applyView) {
-            pose.mulPose(new Quaternionf(camera.rotation()).conjugate());
+            pose.mulPose(new Quaternionf(camera).conjugate());
         }
         for (Floating line : shown) {
             draw(line, now, pose, sink, mc.font, camera);
@@ -137,7 +139,7 @@ public final class Lyrics3D {
         }
     }
 
-    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Camera camera) {
+    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Quaternionf camera) {
         long age = now - line.born;
         float in = Mth.clamp(age / (float) FADE_IN, 0f, 1f);
         float out = line.dying == Long.MAX_VALUE ? 1f : 1f - Mth.clamp((now - line.dying) / (float) FADE_OUT, 0f, 1f);
@@ -152,7 +154,7 @@ public final class Lyrics3D {
 
         pose.pushPose();
         pose.translate(dir.x * DISTANCE + sway, dir.y * DISTANCE + rise, dir.z * DISTANCE);
-        pose.mulPose(camera.rotation());
+        pose.mulPose(camera);
         pose.mulPose(Axis.ZP.rotationDegrees(line.roll));
         float scale = 0.05f * (0.8f + 0.2f * easeOut(in)) * (1f + (1f - out) * 0.15f);
         pose.scale(scale, -scale, scale);
