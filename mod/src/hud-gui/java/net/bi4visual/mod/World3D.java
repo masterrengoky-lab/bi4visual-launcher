@@ -82,8 +82,9 @@ public final class World3D {
         }
 
         if (mc.options.getCameraType().isFirstPerson()) {
-            // The trail is behind the player, only third person sees it.
+            // The trail and the cosmetics are around the player, only third person sees them.
         } else {
+            drawn |= cosmetics(sink, pose, camera, mc, player, eye, now, accent);
             synchronized (trail) {
                 trail.removeIf(dot -> now - dot.born > TRAIL_LIFE);
                 for (Dot dot : trail) {
@@ -115,6 +116,39 @@ public final class World3D {
             drawn = true;
         }
         return drawn;
+    }
+
+    /** Halo, aura and orbit around the own player, sized with the custom model. */
+    private static boolean cosmetics(Lyrics3D.Sink sink, PoseStack pose, Quaternionf camera, Minecraft mc, Player player,
+                                     Vec3 eye, long now, int accent) {
+        Config.Data d = Config.get();
+        if (!d.halo && !d.aura && !d.orbit) return false;
+        float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+        Vec3 feet = player.getPosition(partial);
+        float k = Modules.modelScale();
+        double x = feet.x - eye.x, y = feet.y - eye.y, z = feet.z - eye.z;
+        float t = (now % 100_000L) / 1000f;
+        if (d.halo) {
+            float bob = Mth.sin(t * 2.2f) * 0.03f;
+            double top = (player.isCrouching() ? 1.6 : 1.95) * k + 0.12 + bob;
+            flat(sink, pose, x, y + top, z, 0.28f * k, 0xE0000000 | accent);
+            flat(sink, pose, x, y + top, z, 0.34f * k, 0x50000000 | accent);
+        }
+        if (d.aura) {
+            float pulse = (t * 0.8f) % 1f;
+            flat(sink, pose, x, y + 0.03, z, (0.45f + pulse * 0.45f) * k, ((int) (170 * (1f - pulse)) << 24) | accent);
+            flat(sink, pose, x, y + 0.03, z, 0.5f * k, 0x60000000 | accent);
+        }
+        if (d.orbit) {
+            for (int i = 0; i < 3; i++) {
+                float a = t * 2.4f + i * Mth.TWO_PI / 3f;
+                double ox = Math.cos(a) * 0.7 * k, oz = Math.sin(a) * 0.7 * k;
+                double oy = (1.0 + Mth.sin(t * 1.7f + i * 2f) * 0.35) * k;
+                billboard(sink, pose, camera, x + ox, y + oy, z + oz, Fonts.fx('\ue031'), 0.22f * k / 64f, 0xF0000000 | accent, -32f, 0f);
+                billboard(sink, pose, camera, x + ox, y + oy, z + oz, Fonts.fx('\ue031'), 0.42f * k / 64f, 0x40000000 | accent, -32f, 0f);
+            }
+        }
+        return true;
     }
 
     /** A ring glyph lying flat on the ground, centred at the point. */

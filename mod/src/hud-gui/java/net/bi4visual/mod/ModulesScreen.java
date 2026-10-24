@@ -51,6 +51,8 @@ public class ModulesScreen extends Screen {
     private static String query = "";
     private static int scroll;
     private static String capturing;
+    /** Which part of the Cosmetics section is open: model, swords or world. */
+    private static String cosTab = "swords";
 
     private final List<AbstractWidget> content = new ArrayList<>();
     private EditBox search;
@@ -144,7 +146,10 @@ public class ModulesScreen extends Screen {
     }
 
     private void modules() {
-        List<Modules.Module> list = shownModules();
+        modules(shownModules(), cy, ch);
+    }
+
+    private void modules(List<Modules.Module> list, int cy, int ch) {
         int colW = (cw - 6) / 2;
         int rowH = 32;
         int rows = (list.size() + 1) / 2;
@@ -186,6 +191,23 @@ public class ModulesScreen extends Screen {
     }
 
     private void cosmetics() {
+        String[][] tabs = {{"model", "Кастом модель"}, {"swords", "Кастом мечи"}, {"world", "Косметика"}};
+        int x = cx;
+        for (String[] tab : tabs) {
+            int w = font.width(Fonts.small(tab[1])) + 14;
+            add(new MenuButton(x, cy, w, 13, tab[1], (g, b, hover) -> drawTab(g, b, tab[1], tab[0].equals(cosTab), hover), b -> {
+                cosTab = tab[0];
+                scroll = 0;
+                rebuildContent();
+            }));
+            x += w + 4;
+        }
+        if (cosTab.equals("model")) modules(Modules.in(Modules.Category.MODEL), cy + 19, ch - 19);
+        else if (cosTab.equals("world")) modules(Modules.in(Modules.Category.WORLD), cy + 19, ch - 19);
+        else swords(cy + 19, ch - 19);
+    }
+
+    private void swords(int cy, int ch) {
         List<String> names = new ArrayList<>();
         names.add("");
         names.addAll(Cosmetics.names());
@@ -372,7 +394,7 @@ public class ModulesScreen extends Screen {
         int ax = cx + font.width(Fonts.hud("Activity view  "));
         g.drawString(font, Fonts.hud((query.isBlank() ? page.icon : "⌕") + " " + where), ax, py + 11, accent, false);
 
-        if (page == Page.COSMETICS && query.isBlank() && Cosmetics.names().isEmpty()) {
+        if (page == Page.COSMETICS && query.isBlank() && cosTab.equals("swords") && Cosmetics.names().isEmpty()) {
             centred(g, "Косметики нет: импортируй zip в лаунчере", cy + ch / 2 - 6);
             centred(g, "Настройки → Игра → Косметика", cy + ch / 2 + 6);
         }
@@ -506,6 +528,14 @@ public class ModulesScreen extends Screen {
         while (label.length() > 3 && font.width(Fonts.small(label)) > w - 6) label = label.substring(0, label.length() - 2);
         if (!label.equals(name) && !name.isEmpty()) label = label.trim() + "…";
         g.drawString(font, Fonts.small(label), x + (w - font.width(Fonts.small(label))) / 2, y + h - 11, selected ? TEXT : 0xFFB4BAC6, false);
+    }
+
+    private static void drawTab(GuiGraphics g, Button b, String label, boolean selected, boolean hover) {
+        rounded(g, b.getX(), b.getY(), b.getWidth(), b.getHeight(), selected ? Config.accent() : hover ? CARD_HOVER : CARD);
+        Font font = font();
+        int tw = font.width(Fonts.small(label));
+        g.drawString(font, Fonts.small(label), b.getX() + (b.getWidth() - tw) / 2, b.getY() + 3,
+                selected ? 0xFFFFFFFF : 0xFFB4BAC6, false);
     }
 
     private static void drawRow(GuiGraphics g, Button b, String name, String info, boolean hover) {

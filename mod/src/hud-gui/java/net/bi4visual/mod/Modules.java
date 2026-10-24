@@ -15,7 +15,9 @@ import net.minecraft.world.entity.player.Player;
  */
 public final class Modules {
     public enum Category {
-        RENDER("Render"), INTERFACE("Interface"), UTILITY("Utility");
+        RENDER("Render"), INTERFACE("Interface"), UTILITY("Utility"),
+        /** Shown in the Cosmetics section: the model and things around the player. */
+        MODEL("Модель"), WORLD("Косметика");
 
         public final String title;
 
@@ -83,6 +85,14 @@ public final class Modules {
             onOff("trails", "Trails", "Светящийся след за тобой", Category.RENDER, d -> d.trails, (d, v) -> d.trails = v),
             cycle("atmosphere", "Atmosphere", "Падающий снег вокруг тебя", Category.RENDER, d -> d.atmosphere, (d, v) -> d.atmosphere = v,
                     new String[] {"off", "light", "medium", "heavy"}, new String[] {"выкл", "Слабый", "Средний", "Сильный"}),
+            // Cosmetics: custom model
+            cycle("model", "Размер модели", "Твой персонаж в F5 меньше или больше (видишь только ты)", Category.MODEL, d -> d.model, (d, v) -> d.model = v,
+                    new String[] {"normal", "small", "mini", "big"}, new String[] {"Обычный", "Маленький", "Мини", "Большой"}),
+            onOff("outline", "Контур", "Светящийся контур твоего персонажа цветом темы", Category.MODEL, d -> d.outline, (d, v) -> d.outline = v),
+            // Cosmetics: things around the player, third person
+            onOff("halo", "Нимб", "Светящееся кольцо над головой", Category.WORLD, d -> d.halo, (d, v) -> d.halo = v),
+            onOff("aura", "Аура", "Пульсирующий круг под ногами", Category.WORLD, d -> d.aura, (d, v) -> d.aura = v),
+            onOff("orbit", "Орбита", "Огоньки летают вокруг тебя", Category.WORLD, d -> d.orbit, (d, v) -> d.orbit = v),
             // Interface
             onOff("hud", "HUD", "Все панели bi4visual", Category.INTERFACE, d -> d.hud, (d, v) -> d.hud = v),
             onOff("island", "Watermark", "Ник, время, FPS, пинг и трек сверху", Category.INTERFACE, d -> d.island, (d, v) -> d.island = v),
@@ -128,6 +138,16 @@ public final class Modules {
             if (m.category == c) out.add(m);
         }
         return out;
+    }
+
+    /** How much bigger the own model is drawn. */
+    public static float modelScale() {
+        return switch (Config.get().model) {
+            case "small" -> 0.75f;
+            case "mini" -> 0.5f;
+            case "big" -> 1.25f;
+            default -> 1f;
+        };
     }
 
     /** True while zoom is on and its key is held, with no screen open. */

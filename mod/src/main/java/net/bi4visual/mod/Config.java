@@ -34,6 +34,12 @@ public final class Config {
         public boolean handGlow = false;
         /** HMI: item in hand sways behind the view and breathes: off, soft or strong. */
         public String hmi = "off";
+        /** Own player only: size of the model, an outline in the theme colour, and things drawn around it. */
+        public String model = "normal";
+        public boolean outline = false;
+        public boolean halo = false;
+        public boolean aura = false;
+        public boolean orbit = false;
         public boolean trails = false;
         public String atmosphere = "off";
         /** Interface panels: inventory contents, coordinates, module binds, playing track. */
