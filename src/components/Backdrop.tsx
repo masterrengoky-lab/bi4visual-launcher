@@ -1,9 +1,11 @@
 import { useMemo } from "react";
+import { BG_PRESETS } from "../lib/theme";
 
 /** Animated background: drifting colour glows, a faint block grid and floating pixels. */
-type Props = { image: string | null; dim: number; blur: number; particles: boolean };
+type Props = { image: string | null; dim: number; blur: number; particles: boolean; preset: string };
 
-export default function Backdrop({ image, dim, blur, particles }: Props) {
+export default function Backdrop({ image, dim, blur, particles, preset }: Props) {
+  const scene = BG_PRESETS.find((p) => p.id === preset && p.id !== "scene");
   const pixels = useMemo(
     () =>
       Array.from({ length: 40 }, (_, i) => ({
@@ -21,6 +23,12 @@ export default function Backdrop({ image, dim, blur, particles }: Props) {
         <>
           <div className="bg-image" style={{ backgroundImage: `url("${image}")`, filter: blur ? `blur(${blur}px)` : undefined }} />
           <div className="bg-dim" style={{ opacity: dim / 100 }} />
+        </>
+      ) : scene ? (
+        <>
+          <div className="bg-image" style={{ background: scene.css, filter: blur ? `blur(${blur}px)` : undefined }} />
+          <div className="grid" />
+          <div className="bg-dim" style={{ opacity: dim / 200 }} />
         </>
       ) : (
         <>

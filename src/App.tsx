@@ -18,18 +18,22 @@ import SkinViewer from "./components/SkinViewer";
 import Avatar from "./components/Avatar";
 import InstanceIcon from "./components/InstanceIcon";
 import AccountsModal from "./components/AccountsModal";
-import SettingsModal from "./components/SettingsModal";
+import SettingsPage from "./components/SettingsPage";
 import LogModal from "./components/LogModal";
 import InstancesPanel from "./components/InstancesPanel";
 import ModsPanel from "./components/ModsPanel";
 import ModpacksPanel from "./components/ModpacksPanel";
-import SkinPanel from "./components/SkinPanel";
+import SkinPage from "./components/SkinPage";
 import FeaturedPacks from "./components/FeaturedPacks";
 import SkinFront from "./components/SkinFront";
 import { BookArt, ChestArt, GrassBlockArt } from "./components/PixelArt";
 import { EMOTES, type EmoteKind } from "./lib/livelyAnimation";
+import { applyTheme } from "./lib/theme";
+import { setUiSounds } from "./lib/sounds";
+import { useMusic } from "./lib/useMusic";
 
-type ModalName = "accounts" | "settings" | "log" | "instances" | "mods" | "modpacks" | "skin" | null;
+type ModalName = "accounts" | "log" | "instances" | "mods" | "modpacks" | null;
+type PageName = "lobby" | "settings" | "skin";
 
 const MAX_LOG = 2000;
 
@@ -40,6 +44,7 @@ export default function App() {
   const [skin, setSkin] = useState<Skin | null>(null);
   const [background, setBackground] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalName>(null);
+  const [page, setPage] = useState<PageName>("lobby");
   const [game, setGame] = useState<GameState["state"]>("stopped");
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +71,13 @@ export default function App() {
     ];
     return () => subs.forEach((p) => p.then((off) => off()));
   }, []);
+
+  useEffect(() => {
+    if (!settings) return;
+    applyTheme(settings);
+    setUiSounds(settings.ui_sounds);
+  }, [settings?.accent, settings?.ui_scale, settings?.ui_sounds]);
+  const music = useMusic(settings?.music ?? false, settings?.music_autoplay ?? false, settings?.music_volume ?? 40);
 
   const stageRef = useRef<HTMLElement>(null);
   const [stageSize, setStageSize] = useState({ w: 380, h: 400 });
@@ -118,6 +130,7 @@ export default function App() {
         dim={settings?.bg_dim ?? 45}
         blur={settings?.bg_blur ?? 3}
         particles={settings?.particles ?? true}
+        preset={settings?.bg_preset ?? "scene"}
       />
       <TitleBar />
 
@@ -126,7 +139,7 @@ export default function App() {
           <Tile title="Сборки" color="violet" onClick={() => setModal("instances")}>
             <ChestArt className="tile-art chest" />
           </Tile>
-          <Tile title="Мой скин" color="blue" onClick={() => setModal("skin")}>
+          <Tile title="Мой скин" color="blue" onClick={() => setPage("skin")}>
             <SkinFront className="tile-art skin" skin={skin?.data_url ?? null} slim={skin?.slim ?? false} />
           </Tile>
           <Tile title="Моды" color="green" onClick={() => setModal("mods")}>
@@ -158,7 +171,7 @@ export default function App() {
           <button className="hud square" title="Журнал игры" onClick={() => setModal("log")}>
             <BugIcon />
           </button>
-          <button className="hud square" title="Настройки" onClick={() => setModal("settings")}>
+          <button className="hud square" title="Настройки" onClick={() => setPage("settings")}>
             <GearIcon />
           </button>
         </header>
@@ -251,7 +264,30 @@ export default function App() {
       </div>
 
       {modal === "accounts" && accounts && <AccountsModal accounts={accounts} onChange={setAccounts} onClose={close} />}
-      {modal === "settings" && settings && <SettingsModal settings={settings} background={background} onBackground={setBackground} onSave={updateSettings} onClose={close} />}
+      {page === "settings" && settings && (
+        <SettingsPage
+          settings={settings}
+          background={background}
+          account={account}
+          music={music}
+          log={log}
+          onBackground={setBackground}
+          onSave={updateSettings}
+          onAccounts={() => setModal("accounts")}
+          onClose={() => setPage("lobby")}
+        />
+      )}
+      {page === "skin" && (
+        <SkinPage
+          account={account}
+          skin={skin}
+          cosmetics={settings?.cosmetics ?? []}
+          onCosmetics={(c) => settings && updateSettings({ ...settings, cosmetics: c })}
+          onChanged={(a) => (a ? setAccounts(a) : reloadSkin())}
+          onAccounts={() => setModal("accounts")}
+          onClose={() => setPage("lobby")}
+        />
+      )}
       {modal === "log" && <LogModal lines={log} onClose={close} />}
       {modal === "instances" && instances && settings && (
         <InstancesPanel
@@ -272,17 +308,6 @@ export default function App() {
             setInstances(i);
             close();
           }}
-          onClose={close}
-        />
-      )}
-      {modal === "skin" && (
-        <SkinPanel
-          account={account}
-          skin={skin}
-          cosmetics={settings?.cosmetics ?? []}
-          onCosmetics={(c) => settings && updateSettings({ ...settings, cosmetics: c })}
-          onChanged={(a) => (a ? setAccounts(a) : reloadSkin())}
-          onAccounts={() => setModal("accounts")}
           onClose={close}
         />
       )}

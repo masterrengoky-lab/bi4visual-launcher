@@ -35,6 +35,24 @@ pub struct Settings {
     pub sky: String,
     /// Keep the game at night on the player's side.
     pub always_night: bool,
+    /// Colour of buttons and highlights, as #rrggbb.
+    pub accent: String,
+    /// Built-in background used when no own picture is set.
+    pub bg_preset: String,
+    /// Interface size in percent: 100, 115, 130 or 150.
+    pub ui_scale: u16,
+    /// What the launcher window does when the game starts: "keep", "minimize" or "hide".
+    pub on_launch: String,
+    /// Bring the launcher back when the game closes.
+    pub restore_after_game: bool,
+    /// Own music in the launcher.
+    pub music: bool,
+    /// Start the music when the launcher opens.
+    pub music_autoplay: bool,
+    /// Music volume, 0–100.
+    pub music_volume: u8,
+    /// Short clicks on buttons.
+    pub ui_sounds: bool,
 }
 
 impl Default for Settings {
@@ -57,6 +75,15 @@ impl Default for Settings {
             lyrics: true,
             sky: "galaxy".into(),
             always_night: true,
+            accent: "#3fbf5f".into(),
+            bg_preset: "scene".into(),
+            ui_scale: 100,
+            on_launch: "hide".into(),
+            restore_after_game: true,
+            music: false,
+            music_autoplay: false,
+            music_volume: 40,
+            ui_sounds: true,
         }
     }
 }

@@ -4,7 +4,7 @@ mod media;
 
 use bi4visual_core::{
     accounts::{self, AccountStore, AccountView},
-    backgrounds,
+    backgrounds, music,
     download, fabric, forge,
     instances::{self, Instance, Loader, ModFile},
     java, launch, lyrics,
@@ -85,6 +85,87 @@ fn background_clear(st: State<AppState>) -> Res<()> {
     let mut s = Settings::load(&st.paths);
     s.background = None;
     s.save(&st.paths).map_err(err)
+}
+
+// ---------- launcher music ----------
+
+#[tauri::command]
+fn music_list(st: State<AppState>) -> Vec<String> {
+    music::list(&st.paths)
+}
+
+#[tauri::command]
+fn music_add(st: State<AppState>, name: String, data: String) -> Res<Vec<String>> {
+    music::add_base64(&st.paths, &name, &data).map_err(err)?;
+    Ok(music::list(&st.paths))
+}
+
+#[tauri::command]
+fn music_remove(st: State<AppState>, name: String) -> Res<Vec<String>> {
+    music::remove(&st.paths, &name).map_err(err)?;
+    Ok(music::list(&st.paths))
+}
+
+#[tauri::command]
+fn music_load(st: State<AppState>, name: String) -> Res<String> {
+    music::load(&st.paths, &name).ok_or_else(|| "Не удалось прочитать трек".into())
+}
+
+#[tauri::command]
+fn music_open_dir(app: AppHandle, st: State<AppState>) -> Res<()> {
+    open_dir(&app, music::dir(&st.paths))
+}
+
+// ---------- start with the system ----------
+
+#[cfg(windows)]
+const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+
+#[cfg(windows)]
+fn reg(args: &[&str]) -> std::io::Result<std::process::Output> {
+    use std::os::windows::process::CommandExt;
+    std::process::Command::new("reg").args(args).creation_flags(0x0800_0000).output()
+}
+
+#[tauri::command]
+fn autostart_get() -> bool {
+    #[cfg(windows)]
+    {
+        reg(&["query", RUN_KEY, "/v", "bi4visual launcher"]).map(|o| o.status.success()).unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+#[tauri::command]
+fn autostart_set(enabled: bool) -> Res<()> {
+    #[cfg(windows)]
+    {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let value = format!("\"{}\"", exe.display());
+        let out = if enabled {
+            reg(&["add", RUN_KEY, "/v", "bi4visual launcher", "/t", "REG_SZ", "/d", &value, "/f"])
+        } else {
+            reg(&["delete", RUN_KEY, "/v", "bi4visual launcher", "/f"])
+        }
+        .map_err(|e| e.to_string())?;
+        if !out.status.success() && enabled {
+            return Err("Windows не дал включить автозапуск".into());
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enabled;
+        Err("Автозапуск пока есть только на Windows".into())
+    }
+}
+
+#[tauri::command]
+fn launcher_dir(app: AppHandle, st: State<AppState>) -> Res<()> {
+    open_dir(&app, st.paths.root.clone())
 }
 
 fn open_dir(app: &AppHandle, dir: std::path::PathBuf) -> Res<()> {
@@ -486,11 +567,18 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     }
 
     let _ = app.emit("game-state", GameState { state: "running", code: None });
-    if settings.hide_on_launch {
-        if let Some(w) = app.get_webview_window("main") {
-            let _ = w.hide();
+    if let Some(w) = app.get_webview_window("main") {
+        match settings.on_launch.as_str() {
+            "keep" => {}
+            "minimize" => {
+                let _ = w.minimize();
+            }
+            _ => {
+                let _ = w.hide();
+            }
         }
     }
+    let restore = settings.restore_after_game || settings.on_launch == "hide";
 
     let stop_media = Arc::new(AtomicBool::new(false));
     if lyrics_mod && settings.lyrics {
@@ -509,8 +597,9 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
             inst.playtime_secs += started.elapsed().as_secs();
             let _ = inst.save(&paths);
         }
-        if let Some(w) = app2.get_webview_window("main") {
+        if let Some(w) = app2.get_webview_window("main").filter(|_| restore) {
             let _ = w.show();
+            let _ = w.unminimize();
             let _ = w.set_focus();
         }
         let _ = app2.emit("game-state", GameState { state: "stopped", code });
@@ -557,6 +646,14 @@ pub fn run() {
             account_upload_skin,
             account_reset_skin,
             play,
+            music_list,
+            music_add,
+            music_remove,
+            music_load,
+            music_open_dir,
+            autostart_get,
+            autostart_set,
+            launcher_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running bi4visual launcher");

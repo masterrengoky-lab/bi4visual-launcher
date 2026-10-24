@@ -19,6 +19,15 @@ export type Settings = {
   sky: "galaxy" | "aurora" | "both" | "off";
   always_night: boolean;
   cosmetics: string[];
+  accent: string;
+  bg_preset: string;
+  ui_scale: number;
+  on_launch: "keep" | "minimize" | "hide";
+  restore_after_game: boolean;
+  music: boolean;
+  music_autoplay: boolean;
+  music_volume: number;
+  ui_sounds: boolean;
 };
 
 export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge";
@@ -90,6 +99,15 @@ export const api = {
   resetSkin: (id: string) => invoke<Accounts>("account_reset_skin", { id }),
 
   play: () => invoke<void>("play"),
+
+  musicList: () => invoke<string[]>("music_list"),
+  musicAdd: (name: string, data: string) => invoke<string[]>("music_add", { name, data }),
+  musicRemove: (name: string) => invoke<string[]>("music_remove", { name }),
+  musicLoad: (name: string) => invoke<string>("music_load", { name }),
+  musicOpenDir: () => invoke<void>("music_open_dir"),
+  autostartGet: () => invoke<boolean>("autostart_get"),
+  autostartSet: (enabled: boolean) => invoke<void>("autostart_set", { enabled }),
+  openLauncherDir: () => invoke<void>("launcher_dir"),
 };
 
 export function on<T>(event: string, cb: (payload: T) => void): Promise<UnlistenFn> {
