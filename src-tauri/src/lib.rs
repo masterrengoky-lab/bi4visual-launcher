@@ -4,7 +4,7 @@ mod media;
 
 use bi4visual_core::{
     accounts::{self, AccountStore, AccountView},
-    backgrounds, music,
+    backgrounds, cosmetics, music,
     download, fabric, forge,
     instances::{self, Instance, Loader, ModFile},
     java, launch, lyrics,
@@ -164,6 +164,26 @@ fn autostart_set(enabled: bool) -> Res<()> {
 }
 
 #[tauri::command]
+fn cosmetics_open_dir(app: AppHandle, st: State<AppState>) -> Res<()> {
+    open_dir(&app, cosmetics::dir(&st.paths))
+}
+
+#[tauri::command]
+fn cosmetics_import(st: State<AppState>) -> Res<usize> {
+    cosmetics::import(&st.paths).map_err(err)
+}
+
+#[tauri::command]
+fn cosmetics_count(st: State<AppState>) -> usize {
+    cosmetics::names(&st.paths).len()
+}
+
+#[tauri::command]
+fn cosmetics_clear(st: State<AppState>) -> Res<()> {
+    cosmetics::clear(&st.paths).map_err(err)
+}
+
+#[tauri::command]
 fn launcher_dir(app: AppHandle, st: State<AppState>) -> Res<()> {
     open_dir(&app, st.paths.root.clone())
 }
@@ -281,6 +301,17 @@ fn has_fabric_api(paths: &Paths, inst: &Instance) -> bool {
         || std::fs::read_dir(instances::mods_dir(paths, &inst.id))
             .map(|d| d.flatten().any(|e| e.file_name().to_string_lossy().starts_with("fabric-api")))
             .unwrap_or(false)
+}
+
+/// Finds a mod on Modrinth by its exact title for the instance's version and installs it.
+/// False when Modrinth has no build of it for this version.
+async fn install_by_title(client: &reqwest::Client, paths: &Paths, inst: &mut Instance, title: &str) -> anyhow::Result<bool> {
+    let found = modrinth::search(client, title, ProjectType::Mod, Some(&inst.game_version), Some("fabric"), 0).await?;
+    let Some(hit) = found.hits.into_iter().find(|h| h.title.eq_ignore_ascii_case(title)) else {
+        return Ok(false);
+    };
+    modrinth::install_mod(client, paths, inst, &hit.project_id).await?;
+    Ok(true)
 }
 
 async fn ensure_default_instance(st: &AppState) -> anyhow::Result<Instance> {
@@ -519,6 +550,24 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
                 Err(e) => log(format!("Не удалось поставить Fabric API: {e}")),
             }
         }
+        if lyrics_mod {
+            if let Err(e) = cosmetics::apply(&st.paths, &inst.game_dir(&st.paths)) {
+                log(format!("Не удалось подключить косметику: {e}"));
+            }
+            for (wanted, title) in [(settings.hold_my_items, "Hold My Items"), (settings.voice_chat, "Simple Voice Chat")] {
+                if !wanted || inst.mods.iter().any(|m| m.title.eq_ignore_ascii_case(title)) {
+                    continue;
+                }
+                match install_by_title(&st.client, &st.paths, &mut inst, title).await {
+                    Ok(true) => {
+                        inst.save(&st.paths)?;
+                        log(format!("Поставил {title}"));
+                    }
+                    Ok(false) => log(format!("{title} пока нет для {} Fabric", inst.game_version)),
+                    Err(e) => log(format!("Не удалось поставить {title}: {e}")),
+                }
+            }
+        }
         log(if lyrics_mod {
             format!("Мод bi4visual установлен ({} Fabric), меню визуалов в игре — правый Shift", inst.game_version)
         } else {
@@ -650,6 +699,10 @@ pub fn run() {
             autostart_get,
             autostart_set,
             launcher_dir,
+            cosmetics_open_dir,
+            cosmetics_import,
+            cosmetics_count,
+            cosmetics_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running bi4visual launcher");

@@ -281,6 +281,17 @@ function GameTab({ settings: s, set }: TabProps) {
         </Row>
       </Section>
 
+      <Section title="Моды" note="Ставятся сами с Modrinth при запуске, если есть версия под твою сборку">
+        <Row label="Hold My Items" hint="Живые анимации рук и предметов">
+          <Toggle value={s.hold_my_items} onChange={(v) => set("hold_my_items", v)} />
+        </Row>
+        <Row label="Simple Voice Chat" hint="Голосовой чат на серверах, где он есть">
+          <Toggle value={s.voice_chat} onChange={(v) => set("voice_chat", v)} />
+        </Row>
+      </Section>
+
+      <CosmeticsSection />
+
       <Section title="Во время игры">
         <Row label="Лаунчер при запуске игры">
           <Choice value={s.on_launch} options={[["keep", "Оставить"], ["minimize", "Свернуть"], ["hide", "Скрыть"]]} onChange={(v) => set("on_launch", v as Settings["on_launch"])} />
@@ -381,6 +392,43 @@ function LauncherTab({ settings, log }: Props) {
 
 function matches(query: string, ...texts: (string | undefined)[]) {
   return !query || texts.some((t) => t?.toLowerCase().includes(query));
+}
+
+/** Sword cosmetics from the player's own pack: drop a zip into the folder, import, pick in game. */
+function CosmeticsSection() {
+  const [count, setCount] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    api.cosmeticsCount().then(setCount).catch(() => setCount(0));
+  }, []);
+  const run = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const n = await api.cosmeticsImport();
+      setCount(n);
+      setMsg(`Готово: ${n} шт. Выбирай в игре: правый Shift → Cosmetics`);
+    } catch (e) {
+      setMsg(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Section title="Косметика" note="Положи zip с моделями мечей в папку косметики и нажми «Импортировать». Файлы остаются только у тебя">
+      <Row label="Папка косметики" hint={count ? `Импортировано: ${count}` : "Пока ничего не импортировано"}>
+        <div className="row">
+          <button className="ghost-btn" onClick={() => api.cosmeticsOpenDir()}>Открыть</button>
+          <button className="ghost-btn" disabled={busy} onClick={run}>{busy ? "Импорт…" : "Импортировать"}</button>
+          {!!count && (
+            <button className="ghost-btn" onClick={async () => { await api.cosmeticsClear(); setCount(0); setMsg(null); }}>Убрать</button>
+          )}
+        </div>
+      </Row>
+      {msg && <p className="hint-text">{msg}</p>}
+    </Section>
+  );
 }
 
 function Section({ title, note, children }: { title?: string; note?: string; children: ReactNode }) {

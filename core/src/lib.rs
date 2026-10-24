@@ -4,6 +4,7 @@
 
 pub mod accounts;
 pub mod backgrounds;
+pub mod cosmetics;
 pub mod download;
 pub mod fabric;
 pub mod forge;

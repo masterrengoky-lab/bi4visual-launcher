@@ -13,7 +13,8 @@
     "FullbrightMixin",
     "ZoomMixin",
     "ChatMixin",
-    "AttackMixin"
+    "AttackMixin",
+    "CosmeticsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

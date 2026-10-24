@@ -28,6 +28,8 @@ export type Settings = {
   music_autoplay: boolean;
   music_volume: number;
   ui_sounds: boolean;
+  hold_my_items: boolean;
+  voice_chat: boolean;
 };
 
 export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge";
@@ -105,6 +107,10 @@ export const api = {
   musicRemove: (name: string) => invoke<string[]>("music_remove", { name }),
   musicLoad: (name: string) => invoke<string>("music_load", { name }),
   musicOpenDir: () => invoke<void>("music_open_dir"),
+  cosmeticsOpenDir: () => invoke<void>("cosmetics_open_dir"),
+  cosmeticsImport: () => invoke<number>("cosmetics_import"),
+  cosmeticsCount: () => invoke<number>("cosmetics_count"),
+  cosmeticsClear: () => invoke<void>("cosmetics_clear"),
   autostartGet: () => invoke<boolean>("autostart_get"),
   autostartSet: (enabled: boolean) => invoke<void>("autostart_set", { enabled }),
   openLauncherDir: () => invoke<void>("launcher_dir"),

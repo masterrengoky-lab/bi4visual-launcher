@@ -31,6 +31,7 @@ public class ModulesScreen extends Screen {
         RENDER("Render", "◈", Modules.Category.RENDER),
         INTERFACE("Interface", "▣", Modules.Category.INTERFACE),
         UTILITY("Utility", "✱", Modules.Category.UTILITY),
+        COSMETICS("Cosmetics", "⚔", null),
         THEMES("Themes", "✎", null),
         WAYPOINTS("Waypoints", "◎", null),
         CONFIGS("Configs", "⟳", null);
@@ -78,7 +79,7 @@ public class ModulesScreen extends Screen {
         ch = ph - 28 - 8;
 
         int y = py + 30;
-        String[] groups = {"Visual", null, "Other", "Client", null, null};
+        String[] groups = {"Visual", null, "Other", "Client", null, null, null};
         Page[] pages = Page.values();
         for (int i = 0; i < pages.length; i++) {
             if (groups[i] != null) y += 10;
@@ -114,6 +115,8 @@ public class ModulesScreen extends Screen {
         nameBox = xBox = yBox = zBox = null;
         if (!query.isBlank() || page.category != null) {
             modules();
+        } else if (page == Page.COSMETICS) {
+            cosmetics();
         } else if (page == Page.THEMES) {
             themes();
         } else if (page == Page.WAYPOINTS) {
@@ -178,6 +181,32 @@ public class ModulesScreen extends Screen {
                 d.theme = t.id();
                 Config.save(d);
                 Hud.notify("Тема", t.name());
+            }));
+        }
+    }
+
+    private void cosmetics() {
+        List<String> names = new ArrayList<>();
+        names.add("");
+        names.addAll(Cosmetics.names());
+        if (names.size() == 1) return;
+        int cols = 5;
+        int w = (cw - (cols - 1) * 5) / cols;
+        int h = 40;
+        int visible = Math.max(1, ch / (h + 5));
+        int rows = (names.size() + cols - 1) / cols;
+        scroll = Math.max(0, Math.min(scroll, rows - visible));
+        for (int i = 0; i < names.size(); i++) {
+            int row = i / cols - scroll;
+            if (row < 0 || row >= visible) continue;
+            String name = names.get(i);
+            int x = cx + (i % cols) * (w + 5);
+            int y = cy + row * (h + 5);
+            add(new MenuButton(x, y, w, h, name, (g, b, hover) -> drawCosmetic(g, b, name, hover), b -> {
+                Config.Data d = Config.get();
+                d.cosmetic = name;
+                Config.save(d);
+                Hud.notify(name.isEmpty() ? "Косметика" : name, name.isEmpty() ? "выключена" : "в руке");
             }));
         }
     }
@@ -322,7 +351,7 @@ public class ModulesScreen extends Screen {
         g.drawString(font, Fonts.hud("bi4visual"), px + 10, py + 10, TEXT, false);
         g.drawString(font, Fonts.small("1.2"), px + 12 + font.width(Fonts.hud("bi4visual")), py + 11, accent, false);
         int y = py + 30;
-        String[] groups = {"Visual", null, "Other", "Client", null, null};
+        String[] groups = {"Visual", null, "Other", "Client", null, null, null};
         for (int i = 0; i < groups.length; i++) {
             if (groups[i] != null) {
                 g.drawString(font, Fonts.small(groups[i]), px + 10, y + 1, MUTED, false);
@@ -343,6 +372,10 @@ public class ModulesScreen extends Screen {
         int ax = cx + font.width(Fonts.hud("Activity view  "));
         g.drawString(font, Fonts.hud((query.isBlank() ? page.icon : "⌕") + " " + where), ax, py + 11, accent, false);
 
+        if (page == Page.COSMETICS && query.isBlank() && Cosmetics.names().isEmpty()) {
+            centred(g, "Косметики нет: импортируй zip в лаунчере", cy + ch / 2 - 6);
+            centred(g, "Настройки → Игра → Косметика", cy + ch / 2 + 6);
+        }
         if (page == Page.WAYPOINTS && query.isBlank() && Config.get().waypoints.isEmpty()) {
             centred(g, "Точек пока нет", cy + ch / 2);
         }
@@ -455,6 +488,24 @@ public class ModulesScreen extends Screen {
         g.drawString(font, Fonts.small(t.name()), x + 6, y + 18, selected ? TEXT : 0xFFB4BAC6, false);
         String hex = String.format("#%06X", t.colour() & 0xFFFFFF);
         g.drawString(font, Fonts.small(hex), x + w - 6 - font.width(Fonts.small(hex)), y + 18, MUTED, false);
+    }
+
+    private static void drawCosmetic(GuiGraphics g, Button b, String name, boolean hover) {
+        int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        boolean selected = name.equals(Config.get().cosmetic);
+        if (selected) rounded(g, x - 1, y - 1, w + 2, h + 2, Config.accent());
+        rounded(g, x, y, w, h, hover ? CARD_HOVER : CARD);
+        Font font = font();
+        if (name.isEmpty()) {
+            String none = "✕";
+            g.drawString(font, Fonts.hud(none), x + (w - font.width(Fonts.hud(none))) / 2, y + 10, MUTED, false);
+        } else {
+            g.renderItem(Cosmetics.preview(name), x + (w - 16) / 2, y + 5);
+        }
+        String label = name.isEmpty() ? "Без косметики" : name;
+        while (label.length() > 3 && font.width(Fonts.small(label)) > w - 6) label = label.substring(0, label.length() - 2);
+        if (!label.equals(name) && !name.isEmpty()) label = label.trim() + "…";
+        g.drawString(font, Fonts.small(label), x + (w - font.width(Fonts.small(label))) / 2, y + h - 11, selected ? TEXT : 0xFFB4BAC6, false);
     }
 
     private static void drawRow(GuiGraphics g, Button b, String name, String info, boolean hover) {

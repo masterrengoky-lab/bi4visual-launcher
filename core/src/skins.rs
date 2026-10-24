@@ -154,11 +154,11 @@ pub fn apply_pack(paths: &Paths, acc: &Account, game_dir: &std::path::Path) -> R
             r#"{"pack":{"pack_format":15,"supported_formats":[1,99],"description":"Скин из bi4visual launcher"}}"#,
         )?;
     }
-    set_pack_enabled(&game_dir.join("options.txt"), enable)
+    set_pack_enabled(&game_dir.join("options.txt"), PACK_ID, enable)
 }
 
-/// Adds or removes our pack in the `resourcePacks:[...]` line of options.txt.
-fn set_pack_enabled(options: &std::path::Path, enable: bool) -> Result<()> {
+/// Adds or removes a pack in the `resourcePacks:[...]` line of options.txt.
+pub(crate) fn set_pack_enabled(options: &std::path::Path, pack_id: &str, enable: bool) -> Result<()> {
     let text = std::fs::read_to_string(options).unwrap_or_default();
     let mut found = false;
     let mut lines: Vec<String> = text
@@ -167,9 +167,9 @@ fn set_pack_enabled(options: &std::path::Path, enable: bool) -> Result<()> {
             let Some(list) = line.strip_prefix("resourcePacks:") else { return line.to_string() };
             found = true;
             let mut packs: Vec<String> = serde_json::from_str(list).unwrap_or_else(|_| vec!["vanilla".into()]);
-            packs.retain(|p| p != PACK_ID);
+            packs.retain(|p| p != pack_id);
             if enable {
-                packs.push(PACK_ID.into());
+                packs.push(pack_id.into());
             }
             format!("resourcePacks:{}", serde_json::to_string(&packs).unwrap_or_default())
         })
@@ -178,7 +178,7 @@ fn set_pack_enabled(options: &std::path::Path, enable: bool) -> Result<()> {
         if !enable {
             return Ok(());
         }
-        lines.push(format!("resourcePacks:[\"vanilla\",\"{PACK_ID}\"]"));
+        lines.push(format!("resourcePacks:[\"vanilla\",\"{pack_id}\"]"));
     }
     crate::paths::ensure_parent(options)?;
     std::fs::write(options, lines.join("\n") + "\n")?;

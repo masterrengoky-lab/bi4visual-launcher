@@ -53,6 +53,10 @@ pub struct Settings {
     pub music_volume: u8,
     /// Short clicks on buttons.
     pub ui_sounds: bool,
+    /// Put Hold My Items (hand and item animations) into Fabric instances from Modrinth.
+    pub hold_my_items: bool,
+    /// Put Simple Voice Chat into Fabric instances from Modrinth.
+    pub voice_chat: bool,
 }
 
 impl Default for Settings {
@@ -84,6 +88,8 @@ impl Default for Settings {
             music_autoplay: false,
             music_volume: 40,
             ui_sounds: true,
+            hold_my_items: true,
+            voice_chat: true,
         }
     }
 }

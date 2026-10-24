@@ -509,3 +509,4 @@ input[type="range"] { accent-color: var(--accent); }
 .item-skin { height: 68px; width: auto; image-rendering: pixelated; }
 .rarity { position: absolute; top: 6px; left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; background: var(--rarity); color: #fff; }
 .empty-card { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding: 16px; border-radius: 10px; background: #18181b; }
+.hint-text { color: var(--muted, #9aa3b2); font-size: 12px; margin: 6px 0 0; }

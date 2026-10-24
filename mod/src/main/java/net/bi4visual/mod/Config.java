@@ -40,6 +40,8 @@ public final class Config {
         /** Utility: ".рщьу" typed in the Russian layout becomes "/home"; a click sound on hits. */
         public boolean commandFix = true;
         public boolean hitSound = false;
+        /** The sword model shown in the player's hands, by its name in the cosmetics pack; empty for none. */
+        public String cosmetic = "";
         /** Colour theme for the menus and the HUD (see Themes). */
         public String theme = "violet";
         /** Module id to GLFW key code. Zoom is held, the rest toggle. */
