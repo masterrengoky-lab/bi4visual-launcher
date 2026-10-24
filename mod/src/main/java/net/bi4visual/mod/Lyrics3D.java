@@ -9,7 +9,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -22,7 +21,7 @@ import org.joml.Quaternionf;
  */
 public final class Lyrics3D {
     /** Packed light for "lit by sky and block light 15", same as LightTexture.FULL_BRIGHT. */
-    private static final int FULL_BRIGHT = 0xF000F0;
+    public static final int FULL_BRIGHT = 0xF000F0;
     private static final int TOP = 0xE6CCFF;
     private static final int BOTTOM = 0x9A66FF;
     private static final float DISTANCE = 10f;
@@ -57,26 +56,37 @@ public final class Lyrics3D {
 
     private Lyrics3D() {}
 
-    public static void render() {
+    /** Draws one letter; the game version decides how (see the backend's LevelRendererMixin). */
+    public interface Sink {
+        void letter(PoseStack pose, Component letter, float x, float y, int argb);
+    }
+
+    /**
+     * Updates and draws the lines.
+     * @param applyView rotate by the camera ourselves, for backends that draw
+     *                  after the level renderer has dropped its view matrix
+     * @return false when there was nothing to draw
+     */
+    public static boolean render(Sink sink, boolean applyView) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) {
-            return;
+            return false;
         }
         long now = System.currentTimeMillis();
         Camera camera = mc.gameRenderer.getMainCamera();
         update(NowPlaying.get(), now, mc.player);
         if (shown.isEmpty()) {
-            return;
+            return false;
         }
 
-        // The level renderer has already popped its view matrix, so rotate to the camera ourselves.
         PoseStack pose = new PoseStack();
-        pose.mulPose(new Quaternionf(camera.rotation()).conjugate());
-        MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
-        for (Floating line : shown) {
-            draw(line, now, pose, buffers, mc.font, camera);
+        if (applyView) {
+            pose.mulPose(new Quaternionf(camera.rotation()).conjugate());
         }
-        buffers.endBatch();
+        for (Floating line : shown) {
+            draw(line, now, pose, sink, mc.font, camera);
+        }
+        return true;
     }
 
     private static void update(NowPlaying.Data np, long now, Entity viewer) {
@@ -127,7 +137,7 @@ public final class Lyrics3D {
         }
     }
 
-    private static void draw(Floating line, long now, PoseStack pose, MultiBufferSource buffers, Font font, Camera camera) {
+    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Camera camera) {
         long age = now - line.born;
         float in = Mth.clamp(age / (float) FADE_IN, 0f, 1f);
         float out = line.dying == Long.MAX_VALUE ? 1f : 1f - Mth.clamp((now - line.dying) / (float) FADE_OUT, 0f, 1f);
@@ -161,8 +171,7 @@ public final class Lyrics3D {
             if (a > 4) {
                 float y = (1f - easeOut(letterIn)) * 5f;
                 int rgb = lerpColor(TOP, BOTTOM, n <= 1 ? 0f : i / (float) (n - 1));
-                font.drawInBatch(c, x, y, (a << 24) | rgb, true, pose.last().pose(), buffers,
-                        Font.DisplayMode.SEE_THROUGH, 0, FULL_BRIGHT);
+                sink.letter(pose, c, x, y, (a << 24) | rgb);
             }
             x += w;
         }

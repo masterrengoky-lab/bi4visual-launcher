@@ -9,6 +9,12 @@ base {
     archivesName = "bi4visual-${project.minecraft_version}"
 }
 
+// How the lyrics reach the screen changed in 26.2: before it, immediate
+// vertex buffers; from it on, nodes submitted to the level renderer.
+def mc = project.minecraft_version
+def submitNodes = !mc.startsWith('1.') && !(mc ==~ /26\.1(\..*)?/)
+sourceSets.main.java.srcDir(submitNodes ? 'src/submit/java' : 'src/buffers/java')
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings loom.officialMojangMappings()
