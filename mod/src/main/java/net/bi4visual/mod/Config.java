@@ -32,6 +32,8 @@ public final class Config {
         public boolean jumpCircles = true;
         /** See-through first-person arm with a soft glow in the theme colour. */
         public boolean handGlow = false;
+        /** HMI: item in hand sways behind the view and breathes: off, soft or strong. */
+        public String hmi = "off";
         public boolean trails = false;
         public String atmosphere = "off";
         /** Interface panels: inventory contents, coordinates, module binds, playing track. */

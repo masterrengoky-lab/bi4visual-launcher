@@ -77,6 +77,8 @@ public final class Modules {
             cycle("crosshair", "Crosshair", "Свой прицел вместо обычного", Category.RENDER, d -> d.crosshair, (d, v) -> d.crosshair = v,
                     new String[] {"off", "dot", "plus", "circle"}, new String[] {"выкл", "Точка", "Плюс", "Круг"}),
             onOff("handGlow", "HandGlow", "Прозрачная светящаяся рука (1.21.4–1.21.8)", Category.RENDER, d -> d.handGlow, (d, v) -> d.handGlow = v),
+            cycle("hmi", "HMI", "Hold My Items: предмет в руке плавно качается (1.21.4–1.21.8)", Category.RENDER, d -> d.hmi, (d, v) -> d.hmi = v,
+                    new String[] {"off", "soft", "strong"}, new String[] {"выкл", "Мягко", "Сильно"}),
             onOff("jumpCircles", "JumpCircle", "Круги на земле, где ты прыгнул", Category.RENDER, d -> d.jumpCircles, (d, v) -> d.jumpCircles = v),
             onOff("trails", "Trails", "Светящийся след за тобой", Category.RENDER, d -> d.trails, (d, v) -> d.trails = v),
             cycle("atmosphere", "Atmosphere", "Падающий снег вокруг тебя", Category.RENDER, d -> d.atmosphere, (d, v) -> d.atmosphere = v,
