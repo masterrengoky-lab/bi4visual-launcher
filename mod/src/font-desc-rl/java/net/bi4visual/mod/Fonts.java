@@ -13,12 +13,26 @@ public final class Fonts {
             new FontDescription.Resource(ResourceLocation.fromNamespaceAndPath("bi4visual", "sky")));
     private static final Style HUD = Style.EMPTY.withFont(
             new FontDescription.Resource(ResourceLocation.fromNamespaceAndPath("bi4visual", "hud")));
+    private static final Style HUD_TITLE = Style.EMPTY.withFont(
+            new FontDescription.Resource(ResourceLocation.fromNamespaceAndPath("bi4visual", "hud_title")));
+    private static final Style HUD_SMALL = Style.EMPTY.withFont(
+            new FontDescription.Resource(ResourceLocation.fromNamespaceAndPath("bi4visual", "hud_small")));
 
     private Fonts() {}
 
     /** Text in the HUD font (assets/bi4visual/font/hud.json). */
     public static Component hud(String text) {
         return Component.literal(text).withStyle(HUD);
+    }
+
+    /** Large text for menu titles (assets/bi4visual/font/hud_title.json). */
+    public static Component title(String text) {
+        return Component.literal(text).withStyle(HUD_TITLE);
+    }
+
+    /** Small text for captions (assets/bi4visual/font/hud_small.json). */
+    public static Component small(String text) {
+        return Component.literal(text).withStyle(HUD_SMALL);
     }
 
     /** One tile of the sky pictures (assets/bi4visual/font/sky.json). */

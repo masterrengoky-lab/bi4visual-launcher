@@ -6,7 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import net.fabricmc.loader.api.FabricLoader;
 
-/** Visual settings from the launcher (bi4visual/config.json), re-read when the file changes. */
+/** Visual settings (bi4visual/config.json), re-read when the file changes. */
 public final class Config {
     public static final class Data {
         /** "galaxy", "aurora", "both" or "off". */
@@ -24,8 +24,9 @@ public final class Config {
         public boolean toasts = true;
         /** Own main menu instead of the vanilla title screen. */
         public boolean menu = true;
-        /** Highlight colour from the launcher, #rrggbb. */
-        public String accent = "#8b9cf7";
+        /** Main menu background tint (see MenuScreen.BACKGROUNDS) and how dark it is, 0–100. */
+        public String menuBg = "forest";
+        public int menuDim = 55;
     }
 
     private static final Gson GSON = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
@@ -44,14 +45,9 @@ public final class Config {
         return current;
     }
 
-    /** The launcher's highlight colour as an opaque ARGB int. */
+    /** The periwinkle highlight used across the menus and the HUD. */
     public static int accent() {
-        String a = get().accent;
-        try {
-            return 0xFF000000 | Integer.parseInt(a.startsWith("#") ? a.substring(1) : a, 16);
-        } catch (RuntimeException e) {
-            return 0xFF8B9CF7;
-        }
+        return 0xFF8597DC;
     }
 
     public static boolean night() {

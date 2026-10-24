@@ -508,9 +508,6 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         skins::apply_pack(&st.paths, &account, &inst.game_dir(&st.paths))?;
         let lyrics_mod = inst.loader == Loader::Fabric
             && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, true)?;
-        if lyrics_mod {
-            lyrics::write_accent(&inst.game_dir(&st.paths), &settings.accent)?;
-        }
         let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
         // The mod's font and other assets are loaded by Fabric API.
         if lyrics_mod && !has_fabric_api(&st.paths, &inst) {

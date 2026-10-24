@@ -93,7 +93,8 @@ public class ModulesScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partial) {
-        // The world stays visible behind the menu, only dimmed in render().
+        // In game the world stays visible behind the menu, only dimmed in render().
+        if (minecraft.level == null) super.renderBackground(g, mouseX, mouseY, partial);
     }
 
     @Override
