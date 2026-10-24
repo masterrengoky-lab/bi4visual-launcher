@@ -56,6 +56,7 @@ jobs:
       - name: Show build errors
         if: failure()
         run: |
+          echo "::error::$(grep -E "error:" -A3 build.log | head -30 | sed ':a;N;$!ba;s/\n/%0A/g')"
           jar=""
           for j in $(find ~/.gradle .gradle -name "*.jar" -size +5M 2>/dev/null | grep -i minecraft); do
             if unzip -l "$j" | grep -q "net/minecraft/client/gui/Font.class"; then jar=$j; break; fi
@@ -67,7 +68,6 @@ jobs:
             echo "::error::$out"
           done
           fi
-          grep -E "error:|What went wrong|Could not|> |requires|unsupported" -A2 build.log | head -8 | sed 's/^/::error::/'
       - run: |
           mkdir -p out
           cp $(ls build/libs/*.jar | grep -v -- -sources) out/bi4visual-${{ matrix.mc }}.jar
