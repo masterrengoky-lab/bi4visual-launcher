@@ -40,6 +40,10 @@ public final class Config {
         public boolean halo = false;
         public boolean aura = false;
         public boolean orbit = false;
+        /** Cape from the cosmetics pack (file name without .png), empty for none. */
+        public String cape = "";
+        /** Size of swords in first person, percent. */
+        public int swordSize = 100;
         public boolean trails = false;
         public String atmosphere = "off";
         /** Interface panels: inventory contents, coordinates, module binds, playing track. */

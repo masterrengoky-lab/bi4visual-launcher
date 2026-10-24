@@ -6,6 +6,7 @@ import net.bi4visual.mod.Config;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
@@ -65,6 +66,18 @@ public class ItemHandMixin {
         pose.mulPose(Axis.YP.rotationDegrees(dYaw * 0.12f * power));
         pose.mulPose(Axis.ZP.rotationDegrees(dYaw * 0.10f * power * side));
         pose.mulPose(Axis.XP.rotationDegrees(dPitch * 0.10f * power));
+    }
+
+    /** Sword size: scales the item itself, right before it is drawn, so it stays in the hand. */
+    @Inject(method = "renderArmWithItem", require = 0, at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;renderItem(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemDisplayContext;ZLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V"))
+    private void bi4visual$swordSize(AbstractClientPlayer player, float partial, float pitch, InteractionHand hand,
+                                     float swing, ItemStack stack, float equipped, PoseStack pose,
+                                     MultiBufferSource buffers, int light, CallbackInfo ci) {
+        int size = Config.get().swordSize;
+        if (size == 100 || !BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath().endsWith("_sword")) return;
+        float k = size / 100f;
+        pose.scale(k, k, k);
     }
 
     @Inject(method = "renderArmWithItem", at = @At("RETURN"), require = 0)

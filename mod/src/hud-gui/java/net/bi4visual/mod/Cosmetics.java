@@ -37,6 +37,31 @@ public final class Cosmetics {
         return names;
     }
 
+    private static List<String> capes = List.of();
+    private static long capesAt;
+
+    /** Capes in the cosmetics pack: textures/cape/*.png of the bi4visual namespace. */
+    public static List<String> capes() {
+        long now = System.currentTimeMillis();
+        if (now - capesAt > 2000) {
+            capesAt = now;
+            java.util.List<String> out = new java.util.ArrayList<>();
+            try {
+                var found = net.minecraft.client.Minecraft.getInstance().getResourceManager()
+                        .listResources("textures/cape", id -> id.getPath().endsWith(".png"));
+                for (var id : found.keySet()) {
+                    if (!id.getNamespace().equals("bi4visual")) continue;
+                    String path = id.getPath();
+                    out.add(path.substring(path.lastIndexOf('/') + 1, path.length() - 4));
+                }
+            } catch (Exception ignored) {
+            }
+            java.util.Collections.sort(out);
+            capes = out;
+        }
+        return capes;
+    }
+
     /** A diamond sword showing the named model, for the menu previews. */
     public static ItemStack preview(String name) {
         ItemStack stack = new ItemStack(Items.DIAMOND_SWORD);

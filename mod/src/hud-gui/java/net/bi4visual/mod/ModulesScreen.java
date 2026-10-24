@@ -203,8 +203,35 @@ public class ModulesScreen extends Screen {
             x += w + 4;
         }
         if (cosTab.equals("model")) modules(Modules.in(Modules.Category.MODEL), cy + 19, ch - 19);
-        else if (cosTab.equals("world")) modules(Modules.in(Modules.Category.WORLD), cy + 19, ch - 19);
+        else if (cosTab.equals("world")) world(cy + 19, ch - 19);
         else swords(cy + 19, ch - 19);
+    }
+
+    /** Cosmetics tab: halo, aura and orbit cards on top, capes from the pack below. */
+    private void world(int cy, int ch) {
+        List<Modules.Module> list = Modules.in(Modules.Category.WORLD);
+        int rowH = 32;
+        int top = ((list.size() + 1) / 2) * rowH;
+        modules(list, cy, top);
+        List<String> capes = new ArrayList<>();
+        capes.add("");
+        capes.addAll(Cosmetics.capes());
+        if (capes.size() == 1) return;
+        int cols = 4;
+        int w = (cw - (cols - 1) * 5) / cols;
+        int y0 = cy + top + 2;
+        for (int i = 0; i < capes.size(); i++) {
+            int y = y0 + (i / cols) * 20;
+            if (y + 16 > cy + ch) break;
+            String name = capes.get(i);
+            add(new MenuButton(cx + (i % cols) * (w + 5), y, w, 16, name, (g, b, hover) -> drawTab(g, b,
+                    name.isEmpty() ? "Без плаща" : "Плащ " + name, name.equals(Config.get().cape), hover), b -> {
+                Config.Data d = Config.get();
+                d.cape = name;
+                Config.save(d);
+                Hud.notify("Плащ", name.isEmpty() ? "снят" : name);
+            }));
+        }
     }
 
     private void swords(int cy, int ch) {

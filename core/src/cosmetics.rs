@@ -137,6 +137,24 @@ pub fn import_zip(zip_path: &Path, out: &Path, names_out: &Path) -> Result<usize
             }
         }
     }
+    // Capes: any PNG in a "cape" folder of the pack's assets, worn by the own player in game.
+    let capes: Vec<String> = all
+        .iter()
+        .filter(|n| n.starts_with(&prefix) && n.contains("/cape/") && n.ends_with(".png") && !n.contains("/build/"))
+        .cloned()
+        .collect();
+    for cape in capes {
+        let file = cape.rsplit('/').next().unwrap_or_default().to_lowercase();
+        let ok = file.trim_end_matches(".png").chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+        if !ok {
+            continue;
+        }
+        if let Some(bytes) = read_entry(&mut zip, &cape) {
+            let dest = out.join(format!("assets/bi4visual/textures/cape/{file}"));
+            crate::paths::ensure_parent(&dest)?;
+            std::fs::write(dest, bytes)?;
+        }
+    }
     std::fs::write(
         out.join("pack.mcmeta"),
         r#"{"pack":{"pack_format":46,"supported_formats":[46,999],"min_format":46,"max_format":999,"description":"Косметика bi4visual"}}"#,

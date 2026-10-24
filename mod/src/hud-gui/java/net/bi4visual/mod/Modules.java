@@ -88,6 +88,9 @@ public final class Modules {
             // Cosmetics: custom model
             cycle("model", "Размер модели", "Твой персонаж в F5 меньше или больше (видишь только ты)", Category.MODEL, d -> d.model, (d, v) -> d.model = v,
                     new String[] {"normal", "small", "mini", "big"}, new String[] {"Обычный", "Маленький", "Мини", "Большой"}),
+            cycle("swordSize", "Размер меча", "Мечи в руке меньше или больше (от первого лица)", Category.MODEL,
+                    d -> String.valueOf(d.swordSize), (d, v) -> d.swordSize = Integer.parseInt(v),
+                    new String[] {"100", "85", "70", "55", "40"}, new String[] {"100%", "85%", "70%", "55%", "40%"}),
             onOff("outline", "Контур", "Светящийся контур твоего персонажа цветом темы", Category.MODEL, d -> d.outline, (d, v) -> d.outline = v),
             // Cosmetics: things around the player, third person
             onOff("halo", "Нимб", "Светящееся кольцо над головой", Category.WORLD, d -> d.halo, (d, v) -> d.halo = v),
