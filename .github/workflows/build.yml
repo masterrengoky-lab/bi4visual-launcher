@@ -66,6 +66,10 @@ jobs:
           for j in $(find ~/.gradle .gradle -name "*.jar" -size +5M 2>/dev/null | grep -i minecraft); do
             if unzip -l "$j" | grep -q "net/minecraft/client/renderer/LevelRenderer.class"; then jar=$j; break; fi
           done
+          st=$(javap -cp "$jar" net.minecraft.network.chat.Style | grep -E "withFont|getFont" | tr '\n' ' ')
+          rl=$(unzip -l "$jar" | grep -oE "net/minecraft/resources/(ResourceLocation|Identifier)\.class" | tr '\n' ' ')
+          fd=$(unzip -l "$jar" | grep -oE "net/minecraft/network/chat/FontDescription[A-Za-z$]*\.class" | tr '\n' ' ')
+          echo "::notice::$mc | $st | $rl | $fd"
           if javap -p -cp "$jar" net.minecraft.client.renderer.LevelRenderer | grep -q " $hook("; then
             echo "LevelRenderer.$hook найден"
           else
