@@ -6,7 +6,8 @@
   "client": [
     "LevelRendererMixin",
     "SkyRendererMixin",
-    "LevelTimeMixin"
+    "LevelTimeMixin",
+    "FontFilterMixin"
   ],
   "injectors": {
     "defaultRequire": 1

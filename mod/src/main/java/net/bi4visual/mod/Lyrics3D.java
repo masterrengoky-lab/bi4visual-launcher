@@ -261,8 +261,8 @@ public final class Lyrics3D {
                 pose.translate(pos.x, pos.y, pos.z);
                 rotate(pose, facing);
                 pose.scale(pixel * pop, -pixel * pop, pixel * pop);
-                int glow = ((int) (a * 0.22f) << 24) | GLOW;
-                if (a * 0.22f > 4) {
+                int glow = ((int) (a * 0.16f) << 24) | GLOW;
+                if (a * 0.16f > 4) {
                     for (float[] o : GLOW_OFFSETS) {
                         sink.letter(pose, c, -w / 2f + o[0], -4f + o[1], glow, false);
                     }
@@ -274,9 +274,9 @@ public final class Lyrics3D {
         }
     }
 
+    /** A thin soft halo; wider offsets made the letters look smeared. */
     private static final float[][] GLOW_OFFSETS = {
-        {-0.8f, 0f}, {0.8f, 0f}, {0f, -0.8f}, {0f, 0.8f},
-        {-0.6f, -0.6f}, {0.6f, -0.6f}, {-0.6f, 0.6f}, {0.6f, 0.6f},
+        {-0.45f, -0.45f}, {0.45f, -0.45f}, {-0.45f, 0.45f}, {0.45f, 0.45f},
     };
 
     private static float easeInOut(float t) {

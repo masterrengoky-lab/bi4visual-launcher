@@ -5,7 +5,7 @@
       "file": "bi4visual:lyrics.ttf",
       "shift": [0, 0],
       "size": 11.0,
-      "oversample": 6.0
+      "oversample": 10.0
     },
     {
       "type": "reference",
