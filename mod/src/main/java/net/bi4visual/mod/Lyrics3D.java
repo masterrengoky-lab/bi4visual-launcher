@@ -3,54 +3,67 @@ package net.bi4visual.mod;
 import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix3f;
 import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 /**
- * Lines of the playing song floating in front of the player. Each piece appears
- * where the player looks and stays at that spot, types in letter by letter with a
- * glow and a moving gradient, and rises and fades as the next one comes.
+ * Lines of the playing song in the sky around the player. Each piece of two or
+ * three words is laid along an arc around the player, tilted at a random angle;
+ * its letters fly in one by one from further out, glow, and drift away when the
+ * next pieces come.
  */
 public final class Lyrics3D {
     /** Packed light for "lit by sky and block light 15", same as LightTexture.FULL_BRIGHT. */
     public static final int FULL_BRIGHT = 0xF000F0;
-    private static final int LIGHT = 0xF1E4FF;
-    private static final int DEEP = 0xA77BFF;
+    private static final int LIGHT = 0xF4EAFF;
+    private static final int DEEP = 0xB48CFF;
     private static final int GLOW = 0x7A3CF0;
-    private static final float DISTANCE = 14f;
-    /** Blocks between the current line and the one before it. */
-    private static final float LINE_GAP = 1.1f;
-    private static final float PIXEL = 0.06f;
-    private static final long LETTER = 28;
-    private static final long LETTER_IN = 380;
-    private static final long FADE_OUT = 900;
-    /** A line with no next one (an instrumental part) goes away after this. */
+    /** How far the text hangs from the player, in blocks. */
+    private static final float RADIUS = 14f;
+    /** Block size of one font pixel at normal size. */
+    private static final float PIXEL = 0.075f;
+    private static final long LETTER = 35;
+    private static final long LETTER_IN = 520;
+    private static final long FADE_OUT = 1000;
+    /** Older pieces stay this long after a new one appears. */
+    private static final long LINGER = 1600;
+    /** A piece with nothing after it (an instrumental part) goes away after this. */
     private static final long MAX_LIFE = 9000;
 
     private static final class Floating {
         final List<Component> letters = new ArrayList<>();
         final long born;
         long dying = Long.MAX_VALUE;
-        /** Shift in blocks, so neighbouring pieces do not sit on one spot. */
-        final float side;
-        final float lift;
-        /** Where the player looked when the piece appeared; it stays there. */
-        final float yaw;
-        final float pitch;
+        /** Centre of the arc and its basis, fixed in the world around the player. */
+        final Vector3f forward;
+        final Vector3f right;
+        final Vector3f up;
+        final float size;
 
-        Floating(String text, long born, float side, float lift, float yaw, float pitch) {
-            this.side = side;
-            this.lift = lift;
-            this.yaw = yaw;
-            this.pitch = pitch;
-            text.codePoints().forEach(cp -> letters.add(Component.literal(new String(Character.toChars(cp))).withStyle(ChatFormatting.BOLD)));
+        Floating(String text, long born, float yaw, float pitch, float tilt, float size) {
+            text.codePoints().forEach(cp -> letters.add(Fonts.letter(new String(Character.toChars(cp)))));
             this.born = born;
+            this.size = size;
+            Vec3 f = Vec3.directionFromRotation(pitch, yaw);
+            forward = new Vector3f((float) f.x, (float) f.y, (float) f.z).normalize();
+            Vector3f r = new Vector3f(forward).cross(0f, 1f, 0f);
+            if (r.lengthSquared() < 1e-4f) {
+                r.set(1f, 0f, 0f);
+            }
+            r.normalize();
+            Vector3f u = new Vector3f(r).cross(forward).normalize();
+            // Tilt the arc around the forward axis, so pieces run at an angle.
+            float c = Mth.cos(tilt);
+            float sn = Mth.sin(tilt);
+            right = new Vector3f(r).mul(c).add(new Vector3f(u).mul(sn));
+            up = new Vector3f(u).mul(c).sub(new Vector3f(r).mul(sn));
         }
     }
 
@@ -59,6 +72,7 @@ public final class Lyrics3D {
     private static int lineIndex = -1;
     private static int pieceIndex = -1;
     private static int pieceCount;
+    private static final java.util.Random random = new java.util.Random();
     private static float viewYaw;
     private static float viewPitch;
 
@@ -100,7 +114,7 @@ public final class Lyrics3D {
             rotate(pose, new Quaternionf(camera).conjugate());
         }
         for (Floating line : shown) {
-            draw(line, now, pose, sink, mc.font, camera);
+            draw(line, now, pose, sink, mc.font);
         }
         return true;
     }
@@ -185,74 +199,79 @@ public final class Lyrics3D {
         return out;
     }
 
-    /** The new piece appears in front; older ones stay put and fade a moment later. */
+    /** A new piece somewhere in the sky ahead; older ones linger a moment, then drift away. */
     private static void spawn(String text, long now) {
         for (Floating line : shown) {
-            line.dying = Math.min(line.dying, now + 500);
+            line.dying = Math.min(line.dying, now + LINGER);
         }
-        // Pieces of a line step right-down and left-up, the first one centred,
-        // so a piece never lands on top of the one before it.
+        // Alternate sides so a new piece does not land on the one before it.
         int k = pieceCount++;
-        float side = k == 0 ? 0f : (k % 2 == 1 ? 2.2f : -2.2f);
-        float lift = k == 0 ? 0f : (k % 2 == 1 ? -LINE_GAP * 0.6f : LINE_GAP * 0.6f);
-        shown.add(new Floating(text, now, side, lift, viewYaw, viewPitch));
-        while (shown.size() > 4) {
+        float side = (k % 2 == 0 ? 1f : -1f) * (k == 0 ? 0f : 1f);
+        float yaw = viewYaw + side * (12f + random.nextFloat() * 28f) + (random.nextFloat() - 0.5f) * 10f;
+        float pitch = Mth.clamp(viewPitch - 4f - random.nextFloat() * 22f, -60f, 40f);
+        float tilt = (random.nextFloat() - 0.5f) * 0.9f;
+        float size = 0.85f + random.nextFloat() * 0.5f;
+        shown.add(new Floating(text, now, yaw, pitch, tilt, size));
+        while (shown.size() > 5) {
             shown.remove(0);
         }
     }
 
-    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Quaternionf camera) {
-        Vec3 dir = Vec3.directionFromRotation(line.pitch, line.yaw);
+    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font) {
         long age = now - line.born;
         float out = line.dying == Long.MAX_VALUE ? 1f : 1f - Mth.clamp((now - line.dying) / (float) FADE_OUT, 0f, 1f);
-        float outEase = easeInOut(out);
-        if (outEase < 0.01f) {
+        if (out < 0.01f) {
             return;
         }
-
-        pose.pushPose();
-        pose.translate(dir.x * DISTANCE, dir.y * DISTANCE, dir.z * DISTANCE);
-        rotate(pose, camera);
-        // Pieces stay where they appeared; the offsets keep neighbours apart.
-        pose.translate(line.side, line.lift, 0f);
-        float scale = PIXEL * (1f + (1f - outEase) * 0.06f);
-        pose.scale(scale, -scale, scale);
+        float outEase = easeInOut(out);
+        float pixel = PIXEL * line.size;
 
         int width = 0;
         for (Component c : line.letters) {
             width += font.width(c);
         }
+        // Letters sit on a great circle around the player: x pixels along the
+        // text become an angle of x * pixel / RADIUS.
         float x = -width / 2f;
         int n = line.letters.size();
         for (int i = 0; i < n; i++) {
             Component c = line.letters.get(i);
             int w = font.width(c);
             float t = Mth.clamp((age - i * LETTER) / (float) LETTER_IN, 0f, 1f);
-            float alpha = easeOut(t) * outEase;
-            int a = (int) (255 * alpha);
+            float in = easeOut(t);
+            int a = (int) (255 * in * outEase);
             if (a > 4) {
-                float pop = 0.6f + 0.4f * easeOutBack(t);
-                float y = (1f - easeOut(t)) * 6f;
-                // A soft wave of colour running along the line.
+                // Fly in from further out with a little sweep; drift out the same way when leaving.
+                float radius = RADIUS + (1f - in) * 6f + (1f - outEase) * 4f;
+                float angle = (x + w / 2f) * pixel / RADIUS + (1f - in) * 0.12f;
+                float lift = (1f - outEase) * 0.6f;
+
+                Vector3f radial = new Vector3f(line.forward).mul(Mth.cos(angle)).add(new Vector3f(line.right).mul(Mth.sin(angle)));
+                Vector3f tangent = new Vector3f(line.right).mul(Mth.cos(angle)).sub(new Vector3f(line.forward).mul(Mth.sin(angle)));
+                Vector3f normal = new Vector3f(tangent).cross(line.up);
+                Vector3f pos = new Vector3f(radial).mul(radius).add(new Vector3f(line.up).mul(lift));
+
+                // Columns: text x along the arc, text y up, facing the player.
+                Quaternionf facing = new Quaternionf().setFromNormalized(new Matrix3f(tangent, line.up, normal));
                 float wave = 0.5f + 0.5f * Mth.sin(i * 0.45f - age / 450f);
                 int rgb = lerpColor(LIGHT, DEEP, wave);
+                float pop = 0.7f + 0.3f * easeOutBack(t);
 
                 pose.pushPose();
-                pose.translate(x + w / 2f, y + 4f, 0f);
-                pose.scale(pop, pop, 1f);
-                pose.translate(-w / 2f, -4f, 0f);
+                pose.translate(pos.x, pos.y, pos.z);
+                rotate(pose, facing);
+                pose.scale(pixel * pop, -pixel * pop, pixel * pop);
                 int glow = ((int) (a * 0.22f) << 24) | GLOW;
                 if (a * 0.22f > 4) {
                     for (float[] o : GLOW_OFFSETS) {
-                        sink.letter(pose, c, o[0], o[1], glow, false);
+                        sink.letter(pose, c, -w / 2f + o[0], -4f + o[1], glow, false);
                     }
                 }
-                sink.letter(pose, c, 0f, 0f, (a << 24) | rgb, false);
+                sink.letter(pose, c, -w / 2f, -4f, (a << 24) | rgb, false);
                 pose.popPose();
             }
             x += w;
         }
-        pose.popPose();
     }
 
     private static final float[][] GLOW_OFFSETS = {

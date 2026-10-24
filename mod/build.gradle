@@ -9,11 +9,17 @@ base {
     archivesName = "bi4visual-${project.minecraft_version}"
 }
 
-// How the lyrics reach the screen changed in 26.2: before it, immediate
-// vertex buffers; from it on, nodes submitted to the level renderer.
+// Parts of the game API that changed between versions live in their own
+// source folders; pick the ones for this build.
 def mc = project.minecraft_version
-def submitNodes = !mc.startsWith('1.') && !(mc ==~ /26\.1(\..*)?/)
-sourceSets.main.java.srcDir(submitNodes ? 'src/submit/java' : 'src/buffers/java')
+def v = mc.tokenize('.').collect { it as int }
+while (v.size() < 3) { v << 0 }
+def atLeast = { List<Integer> o -> (v[0] <=> o[0] ?: v[1] <=> o[1] ?: v[2] <=> o[2]) >= 0 }
+// 26.2: the world is drawn from submitted nodes instead of immediate buffers.
+sourceSets.main.java.srcDir(atLeast([26, 2, 0]) ? 'src/submit/java' : 'src/buffers/java')
+// Fonts: a ResourceLocation, then a FontDescription (1.21.9), then Identifier (1.21.11).
+sourceSets.main.java.srcDir(atLeast([1, 21, 11]) ? 'src/font-desc-id/java'
+        : atLeast([1, 21, 9]) ? 'src/font-desc-rl/java' : 'src/font-rl/java')
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"

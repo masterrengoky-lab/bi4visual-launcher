@@ -191,6 +191,17 @@ fn instance_open_dir(app: AppHandle, st: State<AppState>, id: String) -> Res<()>
 
 /// The first time, makes a vanilla instance on the latest release and moves the
 /// old shared game folder (from version 0.1) into it.
+/// Modrinth id of Fabric API.
+const FABRIC_API: &str = "P7dR8mSH";
+
+/// Fabric API installed through us, or a jar of it the player put there by hand.
+fn has_fabric_api(paths: &Paths, inst: &Instance) -> bool {
+    inst.mods.iter().any(|m| m.project_id == FABRIC_API)
+        || std::fs::read_dir(instances::mods_dir(paths, &inst.id))
+            .map(|d| d.flatten().any(|e| e.file_name().to_string_lossy().starts_with("fabric-api")))
+            .unwrap_or(false)
+}
+
 async fn ensure_default_instance(st: &AppState) -> anyhow::Result<Instance> {
     let resp = instances_response(&st.paths);
     if let Some(id) = resp.selected {
@@ -416,6 +427,16 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         let lyrics_mod = inst.loader == Loader::Fabric
             && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, settings.lyrics)?;
         let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
+        // The mod's font and other assets are loaded by Fabric API.
+        if lyrics_mod && !has_fabric_api(&st.paths, &inst) {
+            match modrinth::install_mod(&st.client, &st.paths, &mut inst, FABRIC_API).await {
+                Ok(_) => {
+                    inst.save(&st.paths)?;
+                    log("Поставил Fabric API, он нужен моду bi4visual".into());
+                }
+                Err(e) => log(format!("Не удалось поставить Fabric API: {e}")),
+            }
+        }
         if settings.lyrics {
             log(if lyrics_mod {
                 format!("Мод текста песен установлен ({} {})", inst.game_version, "Fabric")

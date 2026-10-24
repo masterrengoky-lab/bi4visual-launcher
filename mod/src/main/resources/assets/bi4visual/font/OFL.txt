@@ -1,0 +1,2 @@
+lyrics.ttf is Unbounded Bold (Latin + Cyrillic subsets) by The Unbounded Project Authors,
+licensed under the SIL Open Font License 1.1: https://openfontlicense.org
