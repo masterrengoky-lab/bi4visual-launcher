@@ -3,7 +3,11 @@
   "minVersion": "0.8",
   "package": "net.bi4visual.mod.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["LevelRendererMixin"],
+  "client": [
+    "LevelRendererMixin",
+    "SkyRendererMixin",
+    "LevelTimeMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

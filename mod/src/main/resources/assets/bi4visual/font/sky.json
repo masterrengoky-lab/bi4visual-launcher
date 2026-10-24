@@ -1,0 +1,23 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "bi4visual:font/galaxy.png",
+      "height": 128,
+      "ascent": 121,
+      "chars": [
+        "\ue000\ue001\ue002\ue003\ue004\ue005\ue006\ue007\ue008\ue009\ue00a\ue00b",
+        "\ue010\ue011\ue012\ue013\ue014\ue015\ue016\ue017\ue018\ue019\ue01a\ue01b"
+      ]
+    },
+    {
+      "type": "bitmap",
+      "file": "bi4visual:font/aurora.png",
+      "height": 128,
+      "ascent": 121,
+      "chars": [
+        "\ue020\ue021\ue022\ue023\ue024\ue025\ue026\ue027"
+      ]
+    }
+  ]
+}

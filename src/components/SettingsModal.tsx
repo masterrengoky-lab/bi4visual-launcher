@@ -114,9 +114,23 @@ export default function SettingsModal({ settings, background, onBackground, onSa
         Скрывать лаунчер во время игры
       </label>
 
+      <h3>Визуалы в игре (Fabric 1.21.4+)</h3>
       <label className="check">
         <input type="checkbox" checked={s.lyrics} onChange={(e) => set("lyrics", e.target.checked)} />
-        Текст песни в мире, когда играет музыка (сборки Fabric 1.21.4+)
+        Текст песни в мире, когда играет музыка
+      </label>
+      <label className="field">
+        <span>Небо (пока на 1.21.4–1.21.8)</span>
+        <select className="input" value={s.sky} onChange={(e) => set("sky", e.target.value as Settings["sky"])}>
+          <option value="galaxy">Галактика</option>
+          <option value="aurora">Северное сияние</option>
+          <option value="both">Галактика и сияние</option>
+          <option value="off">Обычное</option>
+        </select>
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={s.always_night} onChange={(e) => set("always_night", e.target.checked)} />
+        Вечная ночь (видишь только ты)
       </label>
 
       <details>

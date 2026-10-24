@@ -16,6 +16,8 @@ export type Settings = {
   bg_blur: number;
   particles: boolean;
   lyrics: boolean;
+  sky: "galaxy" | "aurora" | "both" | "off";
+  always_night: boolean;
   cosmetics: string[];
 };
 

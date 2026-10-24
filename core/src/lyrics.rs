@@ -124,6 +124,14 @@ fn clean_title(title: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Writes the mod's visual settings to `<game_dir>/bi4visual/config.json`.
+pub fn write_config(game_dir: &Path, sky: &str, night: bool) -> Result<()> {
+    let dir = game_dir.join("bi4visual");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join("config.json"), serde_json::to_vec(&serde_json::json!({ "sky": sky, "night": night }))?)?;
+    Ok(())
+}
+
 pub fn has_mod(bundled: &Path, game_version: &str) -> bool {
     bundled.join(format!("bi4visual-{game_version}.jar")).is_file()
 }

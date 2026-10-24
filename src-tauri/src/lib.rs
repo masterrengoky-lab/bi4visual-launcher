@@ -408,12 +408,12 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         let mut inst = ensure_default_instance(&st).await?;
         // The lyrics live in a Fabric mod: a plain build of a supported version
         // is moved to Fabric, which plays the same without other mods.
-        if settings.lyrics && inst.loader == Loader::Vanilla && lyrics::has_mod(&bundled_mods, &inst.game_version) {
+        if settings.wants_mod() && inst.loader == Loader::Vanilla && lyrics::has_mod(&bundled_mods, &inst.game_version) {
             inst.loader = Loader::Fabric;
             inst.loader_version = None;
             inst.version_id = None;
             inst.save(&st.paths)?;
-            log(format!("Сборка {} переведена на Fabric, чтобы показывать текст песен", inst.name));
+            log(format!("Сборка {} переведена на Fabric, чтобы работали визуалы bi4visual", inst.name));
         }
         let version = instances::ensure_ready(&st.client, &st.paths, &mut inst, &progress).await?;
         let major = VersionJson::load_resolved(&st.paths, &version)?.java_major();
@@ -425,7 +425,10 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         inst.save(&st.paths)?;
         skins::apply_pack(&st.paths, &account, &inst.game_dir(&st.paths))?;
         let lyrics_mod = inst.loader == Loader::Fabric
-            && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, settings.lyrics)?;
+            && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, settings.wants_mod())?;
+        if lyrics_mod {
+            lyrics::write_config(&inst.game_dir(&st.paths), &settings.sky, settings.always_night)?;
+        }
         let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
         // The mod's font and other assets are loaded by Fabric API.
         if lyrics_mod && !has_fabric_api(&st.paths, &inst) {
@@ -437,11 +440,11 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
                 Err(e) => log(format!("Не удалось поставить Fabric API: {e}")),
             }
         }
-        if settings.lyrics {
+        if settings.wants_mod() {
             log(if lyrics_mod {
-                format!("Мод текста песен установлен ({} {})", inst.game_version, "Fabric")
+                format!("Мод bi4visual установлен ({} {})", inst.game_version, "Fabric")
             } else {
-                format!("Текст песен не будет показан: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
+                format!("Визуалы bi4visual не будут работать: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
             });
         }
         Ok((plan, inst.id, lyrics_mod))
@@ -490,7 +493,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     }
 
     let stop_media = Arc::new(AtomicBool::new(false));
-    if lyrics_mod {
+    if lyrics_mod && settings.lyrics {
         tokio::spawn(media::watch(st.client.clone(), plan.game_dir.clone(), stop_media.clone(), log.clone()));
     }
 

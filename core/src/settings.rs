@@ -31,6 +31,10 @@ pub struct Settings {
     pub cosmetics: Vec<String>,
     /// Song lyrics in the world while music plays (needs a Fabric instance).
     pub lyrics: bool,
+    /// Sky drawn by the mod: "galaxy", "aurora", "both" or "off".
+    pub sky: String,
+    /// Keep the game at night on the player's side.
+    pub always_night: bool,
 }
 
 impl Default for Settings {
@@ -51,11 +55,18 @@ impl Default for Settings {
             particles: true,
             cosmetics: Vec::new(),
             lyrics: true,
+            sky: "galaxy".into(),
+            always_night: true,
         }
     }
 }
 
 impl Settings {
+    /// Whether anything needs the bi4visual mod in the game.
+    pub fn wants_mod(&self) -> bool {
+        self.lyrics || self.sky != "off" || self.always_night
+    }
+
     pub fn load(paths: &Paths) -> Self {
         std::fs::read_to_string(paths.settings_file())
             .ok()

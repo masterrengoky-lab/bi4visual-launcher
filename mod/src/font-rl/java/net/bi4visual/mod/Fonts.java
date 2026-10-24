@@ -7,8 +7,14 @@ import net.minecraft.resources.ResourceLocation;
 /** 1.21.4–1.21.8: fonts are picked by a ResourceLocation. */
 public final class Fonts {
     private static final Style LYRICS = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "lyrics"));
+    private static final Style SKY = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "sky"));
 
     private Fonts() {}
+
+    /** One tile of the sky pictures (assets/bi4visual/font/sky.json). */
+    public static Component sky(char tile) {
+        return Component.literal(String.valueOf(tile)).withStyle(SKY);
+    }
 
     /** One letter in the smooth lyrics font (assets/bi4visual/font/lyrics.json). */
     public static Component letter(String text) {

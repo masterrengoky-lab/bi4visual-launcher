@@ -20,6 +20,8 @@ sourceSets.main.java.srcDir(atLeast([26, 2, 0]) ? 'src/submit/java' : 'src/buffe
 // Fonts: a ResourceLocation, then a FontDescription (1.21.9), then Identifier (1.21.11).
 sourceSets.main.java.srcDir(atLeast([1, 21, 11]) ? 'src/font-desc-id/java'
         : atLeast([1, 21, 9]) ? 'src/font-desc-rl/java' : 'src/font-rl/java')
+// 1.21.9: the sky pass stops passing a buffer source we can draw the galaxy into.
+sourceSets.main.java.srcDir(atLeast([1, 21, 9]) ? 'src/sky-none/java' : 'src/sky-buffers/java')
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
