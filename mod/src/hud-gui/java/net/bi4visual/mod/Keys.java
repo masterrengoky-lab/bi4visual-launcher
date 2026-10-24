@@ -3,7 +3,7 @@ package net.bi4visual.mod;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Right Shift, read straight from GLFW on the render thread: the game's own
+ * Right Shift, read straight from GLFW on the render thread (1.21.x): the game's own
  * key APIs changed in 1.21.9, this works the same in every version.
  */
 public final class Keys {
