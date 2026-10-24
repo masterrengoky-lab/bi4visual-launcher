@@ -199,18 +199,18 @@ public final class Lyrics3D {
         return out;
     }
 
-    /** A new piece somewhere in the sky ahead; older ones linger a moment, then drift away. */
+    /** A new piece in front of the player's face; older ones linger a moment, then drift away. */
     private static void spawn(String text, long now) {
         for (Floating line : shown) {
             line.dying = Math.min(line.dying, now + LINGER);
         }
-        // Alternate sides so a new piece does not land on the one before it.
+        // Right where the player looks, a little above the crosshair; consecutive
+        // pieces step slightly up and down so they do not cover each other.
         int k = pieceCount++;
-        float side = (k % 2 == 0 ? 1f : -1f) * (k == 0 ? 0f : 1f);
-        float yaw = viewYaw + side * (12f + random.nextFloat() * 28f) + (random.nextFloat() - 0.5f) * 10f;
-        float pitch = Mth.clamp(viewPitch - 4f - random.nextFloat() * 22f, -60f, 40f);
-        float tilt = (random.nextFloat() - 0.5f) * 0.9f;
-        float size = 0.85f + random.nextFloat() * 0.5f;
+        float yaw = viewYaw + (random.nextFloat() - 0.5f) * 6f;
+        float pitch = Mth.clamp(viewPitch + (k % 2 == 0 ? 0f : 6f), -80f, 80f);
+        float tilt = (random.nextFloat() - 0.5f) * 0.12f;
+        float size = 0.95f + random.nextFloat() * 0.2f;
         shown.add(new Floating(text, now, yaw, pitch, tilt, size));
         while (shown.size() > 5) {
             shown.remove(0);
