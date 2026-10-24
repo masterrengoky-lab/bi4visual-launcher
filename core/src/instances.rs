@@ -164,7 +164,24 @@ pub fn list(paths: &Paths) -> Vec<Instance> {
     v
 }
 
+/// The launcher makes Fabric builds of 1.21.4 and newer only: that is where the bi4visual mod works.
+pub fn supported(game_version: &str) -> bool {
+    let mut parts = game_version.split('.').map(|p| p.parse::<u32>());
+    let mut v = [0u32; 3];
+    for slot in v.iter_mut() {
+        match parts.next() {
+            Some(Ok(n)) => *slot = n,
+            Some(Err(_)) => return false,
+            None => break,
+        }
+    }
+    parts.next().is_none() && (v[0] > 1 || (v[0] == 1 && (v[1] > 21 || (v[1] == 21 && v[2] >= 4))))
+}
+
 pub fn create(paths: &Paths, name: &str, game_version: &str, loader: Loader, loader_version: Option<String>) -> Result<Instance> {
+    if loader != Loader::Fabric || !supported(game_version) {
+        bail!("Лаунчер делает только сборки Fabric 1.21.4 и новее");
+    }
     let name = name.trim();
     if name.is_empty() {
         bail!("Введите название сборки");
@@ -306,6 +323,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn supported_versions() {
+        for v in ["1.21.4", "1.21.11", "26.1", "26.3.1"] {
+            assert!(supported(v), "{v}");
+        }
+        for v in ["1.21.3", "1.20.6", "1.21", "25w14a", "1.21.5-pre1"] {
+            assert!(!supported(v), "{v}");
+        }
+    }
+
+    #[test]
     fn slugs() {
         assert_eq!(slug("Моя сборка 1.21"), "moya-sborka-1-21");
         assert_eq!(slug("  Fabric  Mods!! "), "fabric-mods");
@@ -316,8 +343,10 @@ mod tests {
     fn create_list_mods_delete() {
         let tmp = tempfile::tempdir().unwrap();
         let paths = Paths::new(tmp.path());
-        let a = create(&paths, "Test", "1.21.1", Loader::Fabric, None).unwrap();
-        let b = create(&paths, "Test", "1.20.1", Loader::Vanilla, None).unwrap();
+        let a = create(&paths, "Test", "1.21.4", Loader::Fabric, None).unwrap();
+        assert!(create(&paths, "Old", "1.20.1", Loader::Fabric, None).is_err());
+        assert!(create(&paths, "Plain", "1.21.4", Loader::Vanilla, None).is_err());
+        let b = create(&paths, "Test", "1.21.11", Loader::Fabric, None).unwrap();
         assert_eq!(b.id, "test-2");
         assert_eq!(list(&paths).len(), 2);
 

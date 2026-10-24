@@ -91,7 +91,7 @@ public final class Lyrics3D {
      */
     public static boolean render(Sink sink, boolean applyView) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null) {
+        if (mc.level == null || mc.player == null || !Config.get().lyrics) {
             return false;
         }
         long now = System.currentTimeMillis();

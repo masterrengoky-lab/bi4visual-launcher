@@ -5,15 +5,19 @@ import InstanceIcon from "./InstanceIcon";
 
 type Props = {
   instances: Instances;
-  showSnapshots: boolean;
-  onSnapshots: (v: boolean) => void;
   onChange: (i: Instances) => void;
   onClose: () => void;
 };
 
-const LOADERS: Loader[] = ["vanilla", "fabric", "forge", "neoforge", "quilt"];
+/** The launcher makes Fabric builds of 1.21.4 and newer: that is where the bi4visual mod works. */
+function supported(v: string) {
+  const p = v.split(".").map(Number);
+  if (p.some((n) => !Number.isInteger(n))) return false;
+  const [a = 0, b = 0, c = 0] = p;
+  return a > 1 || (a === 1 && (b > 21 || (b === 21 && c >= 4)));
+}
 
-export default function InstancesPanel({ instances, showSnapshots, onSnapshots, onChange, onClose }: Props) {
+export default function InstancesPanel({ instances, onChange, onClose }: Props) {
   const [creating, setCreating] = useState(instances.instances.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -33,8 +37,6 @@ export default function InstancesPanel({ instances, showSnapshots, onSnapshots, 
     <Modal title={creating ? "Новая сборка" : "Сборки"} onClose={onClose} large>
       {creating ? (
         <CreateForm
-          showSnapshots={showSnapshots}
-          onSnapshots={onSnapshots}
           onCancel={instances.instances.length ? () => setCreating(false) : undefined}
           onCreate={async (name, game, loader, lv) => {
             if (await run(api.createInstance(name, game, loader, lv))) onClose();
@@ -75,20 +77,16 @@ export default function InstancesPanel({ instances, showSnapshots, onSnapshots, 
 }
 
 function CreateForm({
-  showSnapshots,
-  onSnapshots,
   onCancel,
   onCreate,
 }: {
-  showSnapshots: boolean;
-  onSnapshots: (v: boolean) => void;
   onCancel?: () => void;
   onCreate: (name: string, game: string, loader: Loader, loaderVersion: string | null) => void;
 }) {
   const [versions, setVersions] = useState<GameVersions | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [game, setGame] = useState("");
-  const [loader, setLoader] = useState<Loader>("fabric");
+  const loader: Loader = "fabric";
   const [loaderVersions, setLoaderVersions] = useState<string[] | null>(null);
   const [loaderVersion, setLoaderVersion] = useState("");
   const [name, setName] = useState("");
@@ -107,7 +105,7 @@ function CreateForm({
   useEffect(() => {
     setLoaderVersions(null);
     setLoaderVersion("");
-    if (!game || loader === "vanilla") return setLoaderVersions([]);
+    if (!game) return setLoaderVersions([]);
     let alive = true;
     api.loaderVersions(loader, game).then(
       (v) => alive && setLoaderVersions(v),
@@ -119,28 +117,18 @@ function CreateForm({
   }, [game, loader]);
 
   useEffect(() => {
-    if (!nameTouched && game) setName(loader === "vanilla" ? `Minecraft ${game}` : `${LOADER_NAMES[loader]} ${game}`);
+    if (!nameTouched && game) setName(`Fabric ${game}`);
   }, [game, loader, nameTouched]);
 
   const list = useMemo(
-    () => (versions?.versions ?? []).filter((v) => showSnapshots || v.kind === "release"),
-    [versions, showSnapshots],
+    () => (versions?.versions ?? []).filter((v) => v.kind === "release" && supported(v.id)),
+    [versions],
   );
-  const noLoader = loader !== "vanilla" && loaderVersions !== null && loaderVersions.length === 0;
+  const noLoader = loaderVersions !== null && loaderVersions.length === 0;
 
   return (
     <div className="create-form">
       {loadError && <p className="error-text">Не удалось загрузить список версий: {loadError}</p>}
-      <div className="field">
-        <span>Загрузчик модов</span>
-        <div className="segmented">
-          {LOADERS.map((l) => (
-            <button key={l} className={l === loader ? "active" : ""} onClick={() => setLoader(l)}>
-              {LOADER_NAMES[l]}
-            </button>
-          ))}
-        </div>
-      </div>
       <div className="row">
         <label className="field grow">
           <span>Версия игры</span>
@@ -154,7 +142,7 @@ function CreateForm({
             ))}
           </select>
         </label>
-        {loader !== "vanilla" && (
+        {(
           <label className="field grow">
             <span>Версия {LOADER_NAMES[loader]}</span>
             <select className="input" value={loaderVersion} onChange={(e) => setLoaderVersion(e.target.value)} disabled={!loaderVersions?.length}>
@@ -166,10 +154,7 @@ function CreateForm({
           </label>
         )}
       </div>
-      <label className="check">
-        <input type="checkbox" checked={showSnapshots} onChange={(e) => onSnapshots(e.target.checked)} />
-        Показывать снапшоты и старые версии
-      </label>
+      <small className="muted">Сборки только на Fabric 1.21.4 и новее: на них работают визуалы bi4visual (меню в игре на правый Shift).</small>
       <label className="field">
         <span>Название</span>
         <input

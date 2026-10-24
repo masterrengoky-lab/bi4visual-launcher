@@ -238,6 +238,9 @@ pub async fn install_modpack(client: &reqwest::Client, paths: &Paths, project_id
     };
     let game = index.dependencies.get("minecraft").cloned().ok_or_else(|| anyhow!("в модпаке не указана версия игры"))?;
     let (loader, loader_version) = pack_loader(&index.dependencies);
+    if loader != Loader::Fabric || !instances::supported(&game) {
+        bail!("Этот модпак для {game} на {loader:?}, а лаунчер работает только с Fabric 1.21.4 и новее");
+    }
     let mut inst = instances::create(paths, &project.title, &game, loader, loader_version)?;
     inst.icon_url = project.icon_url.clone();
     inst.save(paths)?;

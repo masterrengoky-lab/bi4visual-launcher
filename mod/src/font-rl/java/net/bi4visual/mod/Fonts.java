@@ -8,8 +8,14 @@ import net.minecraft.resources.ResourceLocation;
 public final class Fonts {
     private static final Style LYRICS = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "lyrics"));
     private static final Style SKY = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "sky"));
+    private static final Style HUD = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "hud"));
 
     private Fonts() {}
+
+    /** Text in the HUD font (assets/bi4visual/font/hud.json). */
+    public static Component hud(String text) {
+        return Component.literal(text).withStyle(HUD);
+    }
 
     /** One tile of the sky pictures (assets/bi4visual/font/sky.json). */
     public static Component sky(char tile) {

@@ -292,8 +292,6 @@ export default function App() {
       {modal === "instances" && instances && settings && (
         <InstancesPanel
           instances={instances}
-          showSnapshots={settings.show_snapshots}
-          onSnapshots={(v) => updateSettings({ ...settings, show_snapshots: v })}
           onChange={setInstances}
           onClose={close}
         />

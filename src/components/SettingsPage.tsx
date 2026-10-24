@@ -22,7 +22,6 @@ const TABS = [
   { id: "look", name: "Вид" },
   { id: "sound", name: "Звук" },
   { id: "game", name: "Игра" },
-  { id: "visuals", name: "Визуалы" },
   { id: "account", name: "Аккаунт" },
   { id: "launcher", name: "Лаунчер" },
 ] as const;
@@ -46,7 +45,6 @@ export default function SettingsPage(props: Props) {
     look: <LookTab {...props} set={set} patch={patch} />,
     sound: <SoundTab {...props} set={set} patch={patch} />,
     game: <GameTab {...props} set={set} patch={patch} />,
-    visuals: <VisualsTab {...props} set={set} patch={patch} />,
     account: <AccountTab {...props} />,
     launcher: <LauncherTab {...props} />,
   };
@@ -265,7 +263,7 @@ function GameTab({ settings: s, set }: TabProps) {
   const memIndex = i === -1 ? MEMORY_STEPS.length - 1 : i;
   return (
     <>
-      <Section title="Игра">
+      <Section title="Игра" note="Визуалы bi4visual настраиваются прямо в игре: нажми правый Shift">
         <Row label="Память для игры" hint="Больше 6 ГБ нужно только большим модпакам">
           <div className="range">
             <input type="range" min={0} max={MEMORY_STEPS.length - 1} value={memIndex} onChange={(e) => set("memory_mb", MEMORY_STEPS[Number(e.target.value)])} />
@@ -290,9 +288,6 @@ function GameTab({ settings: s, set }: TabProps) {
         <Row label="Вернуть лаунчер после игры">
           <Toggle value={s.restore_after_game || s.on_launch === "hide"} disabled={s.on_launch === "hide"} onChange={(v) => set("restore_after_game", v)} />
         </Row>
-        <Row label="Снапшоты в списке версий">
-          <Toggle value={s.show_snapshots} onChange={(v) => set("show_snapshots", v)} />
-        </Row>
       </Section>
 
       <Section title="Для опытных">
@@ -301,24 +296,6 @@ function GameTab({ settings: s, set }: TabProps) {
         </Row>
         <Row label="Аргументы JVM">
           <input className="input wide" value={s.extra_jvm_args} onChange={(e) => set("extra_jvm_args", e.target.value)} />
-        </Row>
-      </Section>
-    </>
-  );
-}
-
-function VisualsTab({ settings: s, set }: TabProps) {
-  return (
-    <>
-      <Section title="Визуалы в игре" note="Работают в сборках Fabric 1.21.4 и новее, мод ставится сам">
-        <Row label="Текст песни в мире" hint="Когда играет музыка в Spotify, Яндекс Музыке или браузере">
-          <Toggle value={s.lyrics} onChange={(v) => set("lyrics", v)} />
-        </Row>
-        <Row label="Небо" hint="Пока на 1.21.4–1.21.8">
-          <Choice value={s.sky} options={[["galaxy", "Галактика"], ["aurora", "Сияние"], ["both", "Оба"], ["off", "Обычное"]]} onChange={(v) => set("sky", v as Settings["sky"])} />
-        </Row>
-        <Row label="Вечная ночь" hint="Видишь только ты, на сервер не влияет">
-          <Toggle value={s.always_night} onChange={(v) => set("always_night", v)} />
         </Row>
       </Section>
     </>

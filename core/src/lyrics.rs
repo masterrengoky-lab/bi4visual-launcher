@@ -124,11 +124,19 @@ fn clean_title(title: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// Writes the mod's visual settings to `<game_dir>/bi4visual/config.json`.
-pub fn write_config(game_dir: &Path, sky: &str, night: bool) -> Result<()> {
+/// Puts the launcher's button colour into the mod's `<game_dir>/bi4visual/config.json`.
+/// The other settings there belong to the mod (its Right Shift menu) and are kept.
+pub fn write_accent(game_dir: &Path, accent: &str) -> Result<()> {
     let dir = game_dir.join("bi4visual");
     std::fs::create_dir_all(&dir)?;
-    std::fs::write(dir.join("config.json"), serde_json::to_vec(&serde_json::json!({ "sky": sky, "night": night }))?)?;
+    let file = dir.join("config.json");
+    let mut cfg = std::fs::read(&file)
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .filter(|v| v.is_object())
+        .unwrap_or_else(|| serde_json::json!({}));
+    cfg["accent"] = serde_json::Value::String(accent.to_string());
+    std::fs::write(file, serde_json::to_vec_pretty(&cfg)?)?;
     Ok(())
 }
 

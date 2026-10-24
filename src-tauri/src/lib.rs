@@ -289,7 +289,7 @@ async fn ensure_default_instance(st: &AppState) -> anyhow::Result<Instance> {
         return Instance::load(&st.paths, &id);
     }
     let latest = manifest::fetch_manifest(&st.client).await?.latest.release;
-    let inst = instances::create(&st.paths, &format!("Minecraft {latest}"), &latest, Loader::Vanilla, None)?;
+    let inst = instances::create(&st.paths, &format!("Fabric {latest}"), &latest, Loader::Fabric, None)?;
     let old = st.paths.root.join("minecraft");
     if old.is_dir() {
         let dir = inst.game_dir(&st.paths);
@@ -334,7 +334,8 @@ async fn modrinth_search(
 ) -> Res<SearchResult> {
     let inst = instance.and_then(|id| Instance::load(&st.paths, &id).ok());
     let game = inst.as_ref().map(|i| i.game_version.as_str());
-    let loader = inst.as_ref().and_then(|i| i.loader.modrinth());
+    // Modpacks: only Fabric ones, the launcher makes nothing else.
+    let loader = inst.as_ref().and_then(|i| i.loader.modrinth()).or((kind == ProjectType::Modpack).then_some("fabric"));
     modrinth::search(&st.client, &query, kind, game, loader, offset).await.map_err(err)
 }
 
@@ -487,9 +488,9 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     };
     let result: anyhow::Result<(launch::LaunchPlan, String, bool)> = async {
         let mut inst = ensure_default_instance(&st).await?;
-        // The lyrics live in a Fabric mod: a plain build of a supported version
-        // is moved to Fabric, which plays the same without other mods.
-        if settings.wants_mod() && inst.loader == Loader::Vanilla && lyrics::has_mod(&bundled_mods, &inst.game_version) {
+        // The visuals live in a Fabric mod: a plain build of a supported version
+        // (made by an older launcher) is moved to Fabric, which plays the same without other mods.
+        if inst.loader == Loader::Vanilla && lyrics::has_mod(&bundled_mods, &inst.game_version) {
             inst.loader = Loader::Fabric;
             inst.loader_version = None;
             inst.version_id = None;
@@ -506,9 +507,9 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
         inst.save(&st.paths)?;
         skins::apply_pack(&st.paths, &account, &inst.game_dir(&st.paths))?;
         let lyrics_mod = inst.loader == Loader::Fabric
-            && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, settings.wants_mod())?;
+            && lyrics::install_mod(&bundled_mods, &instances::mods_dir(&st.paths, &inst.id), &inst.game_version, true)?;
         if lyrics_mod {
-            lyrics::write_config(&inst.game_dir(&st.paths), &settings.sky, settings.always_night)?;
+            lyrics::write_accent(&inst.game_dir(&st.paths), &settings.accent)?;
         }
         let plan = launch::build(&st.paths, &version, &account, &settings, java_bin, inst.game_dir(&st.paths))?;
         // The mod's font and other assets are loaded by Fabric API.
@@ -521,13 +522,11 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
                 Err(e) => log(format!("Не удалось поставить Fabric API: {e}")),
             }
         }
-        if settings.wants_mod() {
-            log(if lyrics_mod {
-                format!("Мод bi4visual установлен ({} {})", inst.game_version, "Fabric")
-            } else {
-                format!("Визуалы bi4visual не будут работать: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
-            });
-        }
+        log(if lyrics_mod {
+            format!("Мод bi4visual установлен ({} Fabric), меню визуалов в игре — правый Shift", inst.game_version)
+        } else {
+            format!("Визуалы bi4visual не будут работать: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
+        });
         Ok((plan, inst.id, lyrics_mod))
     }
     .await;
@@ -581,7 +580,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     let restore = settings.restore_after_game || settings.on_launch == "hide";
 
     let stop_media = Arc::new(AtomicBool::new(false));
-    if lyrics_mod && settings.lyrics {
+    if lyrics_mod {
         tokio::spawn(media::watch(st.client.clone(), plan.game_dir.clone(), stop_media.clone(), log.clone()));
     }
 
