@@ -30,6 +30,8 @@ public final class Config {
         public String crosshair = "off";
         /** Rings on the ground where the player jumps, a fading trail behind them, falling snow ("off", "light", "medium", "heavy"). */
         public boolean jumpCircles = true;
+        /** See-through first-person arm with a soft glow in the theme colour. */
+        public boolean handGlow = false;
         public boolean trails = false;
         public String atmosphere = "off";
         /** Interface panels: inventory contents, coordinates, module binds, playing track. */

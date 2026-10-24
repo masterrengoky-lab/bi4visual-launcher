@@ -76,6 +76,7 @@ public final class Modules {
             onOff("zoom", "Zoom", "Приближение, пока держишь клавишу бинда", Category.RENDER, d -> d.zoom, (d, v) -> d.zoom = v),
             cycle("crosshair", "Crosshair", "Свой прицел вместо обычного", Category.RENDER, d -> d.crosshair, (d, v) -> d.crosshair = v,
                     new String[] {"off", "dot", "plus", "circle"}, new String[] {"выкл", "Точка", "Плюс", "Круг"}),
+            onOff("handGlow", "HandGlow", "Прозрачная светящаяся рука (1.21.4–1.21.8)", Category.RENDER, d -> d.handGlow, (d, v) -> d.handGlow = v),
             onOff("jumpCircles", "JumpCircle", "Круги на земле, где ты прыгнул", Category.RENDER, d -> d.jumpCircles, (d, v) -> d.jumpCircles = v),
             onOff("trails", "Trails", "Светящийся след за тобой", Category.RENDER, d -> d.trails, (d, v) -> d.trails = v),
             cycle("atmosphere", "Atmosphere", "Падающий снег вокруг тебя", Category.RENDER, d -> d.atmosphere, (d, v) -> d.atmosphere = v,

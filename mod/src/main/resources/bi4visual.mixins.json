@@ -14,7 +14,8 @@
     "ZoomMixin",
     "ChatMixin",
     "AttackMixin",
-    "CosmeticsMixin"
+    "CosmeticsMixin",
+    "HandMixin"
   ],
   "injectors": {
     "defaultRequire": 1
