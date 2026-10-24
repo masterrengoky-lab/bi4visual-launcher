@@ -66,6 +66,10 @@ jobs:
           for j in $(find ~/.gradle .gradle -name "*.jar" -size +5M 2>/dev/null | grep -i minecraft); do
             if unzip -l "$j" | grep -q "net/minecraft/client/renderer/LevelRenderer.class"; then jar=$j; break; fi
           done
+          sky=$(javap -p -cp "$jar" net.minecraft.client.renderer.SkyRenderer | grep -E "\(" | grep -v lambda | sed 's/^ *//' | tr '\n' '~')
+          echo "::notice::$mc SKY: $sky"
+          lr=$(javap -p -cp "$jar" net.minecraft.client.renderer.LevelRenderer | grep -iE "sky|cloud|weather|addMainPass|renderLevel|render\(" | grep -v lambda | sed 's/^ *//' | tr '\n' '~')
+          echo "::notice::$mc LR: $lr"
           if javap -p -cp "$jar" net.minecraft.client.renderer.LevelRenderer | grep -q " $hook("; then
             echo "LevelRenderer.$hook найден"
           else
