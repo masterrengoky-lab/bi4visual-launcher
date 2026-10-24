@@ -55,18 +55,22 @@ jobs:
         shell: bash
       - name: Show build errors
         if: failure()
+        run: echo "::error::$(grep -vE "^\s*$|Download|lock" build.log | tail -45 | sed ':a;N;$!ba;s/\n/%0A/g')"
+      # Mixins are not checked at compile time: make sure the hooked method
+      # exists in this version, otherwise the lyrics would silently not show.
+      - name: Check the render hook
+        shell: bash
         run: |
-          echo "::error::$(grep -vE "^\s*$|Download|lock" build.log | tail -45 | sed ':a;N;$!ba;s/\n/%0A/g')"
-          jar=""
+          mc=${{ matrix.mc }}
+          if [[ $mc == 1.* || $mc =~ ^26\.1(\.|$) ]]; then hook=renderLevel; else hook=submitFeatures; fi
           for j in $(find ~/.gradle .gradle -name "*.jar" -size +5M 2>/dev/null | grep -i minecraft); do
-            if unzip -l "$j" | grep -q "net/minecraft/client/gui/Font.class"; then jar=$j; break; fi
+            if unzip -l "$j" | grep -q "net/minecraft/client/renderer/LevelRenderer.class"; then jar=$j; break; fi
           done
-          echo "::error::jars: $(find ~/.gradle .gradle -name '*.jar' -size +5M 2>/dev/null | grep -i minecraft | head -8 | tr '\n' ' ')"
-          if [ -n "$jar" ]; then
-          for c in net.minecraft.client.gui.Font net.minecraft.client.renderer.RenderBuffers net.minecraft.client.renderer.SubmitNodeCollector net.minecraft.client.renderer.OrderedSubmitNodeCollector net.minecraft.client.renderer.LevelRenderer net.minecraft.client.renderer.SubmitNodeStorage; do
-            out=$(javap -p -cp "$jar" $c 2>&1 | grep -iE "class|interface|submit|text|draw|render|Source|Collector|Storage|Font\$" | grep -v "lambda" | head -60 | sed ':a;N;$!ba;s/\n/%0A/g')
-            echo "::error::$out"
-          done
+          if javap -p -cp "$jar" net.minecraft.client.renderer.LevelRenderer | grep -q " $hook("; then
+            echo "LevelRenderer.$hook найден"
+          else
+            echo "::error::$mc: нет LevelRenderer.$hook"
+            exit 1
           fi
       - run: |
           mkdir -p out

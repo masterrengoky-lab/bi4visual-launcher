@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(LevelRenderer.class)
 public class LevelRendererMixin {
-    @Inject(method = "renderLevel", at = @At("TAIL"))
+    @Inject(method = "renderLevel", at = @At("TAIL"), require = 0)
     private void bi4visual$lyrics(CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
