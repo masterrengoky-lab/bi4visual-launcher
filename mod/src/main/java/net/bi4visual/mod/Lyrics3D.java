@@ -96,20 +96,10 @@ public final class Lyrics3D {
      */
     public static boolean render(Sink sink, boolean applyView) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null || !Config.get().lyrics) {
+        if (mc.level == null || mc.player == null) {
             return false;
         }
-        long now = System.currentTimeMillis();
         Entity viewer = mc.player;
-        // New pieces appear right in front, a little above the crosshair.
-        viewYaw = viewer.getYRot();
-        viewPitch = Mth.clamp(viewer.getXRot() - 6f, -80f, 80f);
-        update(NowPlaying.get(), now);
-        if (shown.isEmpty()) {
-            return false;
-        }
-
-
         // Same rotation the camera builds from the view angles (Camera#setRotation);
         // taken from the player because the camera's getters differ between versions.
         // The camera looks along its -Z, hence the half turn and the minus on the pitch.
@@ -119,10 +109,39 @@ public final class Lyrics3D {
         if (applyView) {
             rotate(pose, new Quaternionf(camera).conjugate());
         }
+        boolean drawn = false;
+        Layer extra = layer;
+        if (extra != null) {
+            try {
+                drawn = extra.render(sink, pose, camera);
+            } catch (RuntimeException e) {
+                // A broken effect must not take the lyrics down with it.
+            }
+        }
+        if (!Config.get().lyrics) {
+            return drawn;
+        }
+        long now = System.currentTimeMillis();
+        // New pieces appear right in front, a little above the crosshair.
+        viewYaw = viewer.getYRot();
+        viewPitch = Mth.clamp(viewer.getXRot() - 6f, -80f, 80f);
+        update(NowPlaying.get(), now);
         for (Floating line : shown) {
             draw(line, now, pose, sink, mc.font);
         }
-        return true;
+        return drawn || !shown.isEmpty();
+    }
+
+    /** More things drawn in the world the same way (waypoints, jump rings, trails); set by World3D where it exists. */
+    public interface Layer {
+        boolean render(Sink sink, PoseStack pose, Quaternionf camera);
+    }
+
+    public static volatile Layer layer;
+
+    /** Rotates the matrix only (PoseStack#mulPose is gone in 26.3). */
+    public static void turn(PoseStack pose, Quaternionf q) {
+        rotate(pose, q);
     }
 
     private static void update(NowPlaying.Data np, long now) {

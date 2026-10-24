@@ -42,6 +42,7 @@ public final class Hud {
     public static void render(GuiGraphics g) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
+        crosshair(g);
         if (player == null || mc.options.hideGui || !Config.get().hud) {
             return;
         }
@@ -55,7 +56,122 @@ public final class Hud {
         if (c.potions) potions(g, font, player, h, accent);
         if (c.cooldowns) cooldowns(g, font, player, w, h, accent);
         if (c.armour) armour(g, font, player, w, h);
+        if (c.keybinds) keybinds(g, font, accent);
+        if (c.coords) coords(g, font, mc, player, h, accent);
+        if (c.inventory) inventory(g, player, h);
+        if (c.media) media(g, font, w, h, accent);
         if (c.toasts) toasts(g, font, w, h, accent);
+    }
+
+    /** The own crosshair, drawn even with the HUD panels off. */
+    public static void crosshair(GuiGraphics g) {
+        Minecraft mc = Minecraft.getInstance();
+        String style = Config.get().crosshair;
+        if ("off".equals(style) || mc.player == null || mc.options.hideGui || mc.screen != null
+                || !mc.options.getCameraType().isFirstPerson()) return;
+        int cx = g.guiWidth() / 2;
+        int cy = g.guiHeight() / 2;
+        int c = Config.accent();
+        int outline = 0x90000000;
+        switch (style) {
+            case "dot" -> {
+                g.fill(cx - 2, cy - 2, cx + 2, cy + 2, outline);
+                g.fill(cx - 1, cy - 1, cx + 1, cy + 1, c);
+            }
+            case "plus" -> {
+                g.fill(cx - 5, cy - 1, cx + 5, cy + 1, outline);
+                g.fill(cx - 1, cy - 5, cx + 1, cy + 5, outline);
+                g.fill(cx - 4, cy, cx + 4, cy + 1, c);
+                g.fill(cx, cy - 4, cx + 1, cy + 4, c);
+            }
+            default -> {
+                int r = 4;
+                for (int i = 0; i < 32; i++) {
+                    double a = i * Math.PI / 16;
+                    int x = cx + (int) Math.round(Math.cos(a) * r);
+                    int y = cy + (int) Math.round(Math.sin(a) * r);
+                    g.fill(x, y, x + 1, y + 1, c);
+                }
+                g.fill(cx, cy, cx + 1, cy + 1, c);
+            }
+        }
+    }
+
+    private static void keybinds(GuiGraphics g, Font font, int accent) {
+        List<String[]> rows = new ArrayList<>();
+        for (var e : Config.get().binds.entrySet()) {
+            Modules.Module m = Modules.byId(e.getKey());
+            if (m == null || e.getValue() == null || e.getValue() <= 0) continue;
+            String state = m.on() ? "[" + Keys.name(e.getValue()) + "]" : "выкл";
+            rows.add(new String[] {m.name(), state});
+        }
+        if (rows.isEmpty()) return;
+        rows.sort((a, b) -> a[0].compareTo(b[0]));
+        list(g, font, "Бинды", rows, 8, 30, accent);
+    }
+
+    private static void coords(GuiGraphics g, Font font, Minecraft mc, Player player, int h, int accent) {
+        int x = (int) Math.floor(player.getX());
+        int y = (int) Math.floor(player.getY());
+        int z = (int) Math.floor(player.getZ());
+        String main = "XYZ  " + x + "  " + y + "  " + z;
+        String dim = mc.level.dimension().toString();
+        String other = dim.contains("the_nether") ? "Верхний мир  " + x * 8 + "  " + z * 8
+                : dim.contains("overworld") ? "Ад  " + x / 8 + "  " + z / 8 : "";
+        int pw = Math.max(width(font, main), width(font, other)) + PAD * 2 + 6;
+        int ph = other.isEmpty() ? 16 : 28;
+        int py = h - ph - 30;
+        panel(g, 8, py, pw, ph);
+        g.fill(8 + PAD, py + 6, 8 + PAD + 2, py + 10, accent);
+        text(g, font, main, 8 + PAD + 6, py + 4, TEXT);
+        if (!other.isEmpty()) text(g, font, other, 8 + PAD + 6, py + 16, MUTED);
+    }
+
+    private static void inventory(GuiGraphics g, Player player, int h) {
+        int x0 = 8;
+        int y0 = h / 2 + 40;
+        panel(g, x0, y0, 9 * 18 + 4, 3 * 18 + 4);
+        for (int i = 0; i < 27; i++) {
+            ItemStack st = player.getInventory().getItem(9 + i);
+            int x = x0 + 2 + (i % 9) * 18;
+            int y = y0 + 2 + (i / 9) * 18;
+            g.fill(x + 1, y + 1, x + 17, y + 17, 0x30FFFFFF);
+            if (!st.isEmpty()) {
+                g.renderItem(st, x + 1, y + 1);
+                g.renderItemDecorations(Minecraft.getInstance().font, st, x + 1, y + 1);
+            }
+        }
+    }
+
+    private static void media(GuiGraphics g, Font font, int w, int h, int accent) {
+        NowPlaying.Data np = NowPlaying.get();
+        if (np == null || np.title.isBlank()) return;
+        int pw = 150;
+        int ph = 34;
+        int x = w - pw - 8;
+        int y = h - ph - 30;
+        panel(g, x, y, pw, ph);
+        // A cover square with a note, then the title, the artist and the time.
+        rounded(g, x + 5, y + 5, 24, 24, accent);
+        text(g, font, "♪", x + 14, y + 13, 0xFFFFFFFF);
+        text(g, font, cut(font, np.title, pw - 42), x + 34, y + 6, TEXT);
+        text(g, font, cut(font, np.artist.isBlank() ? "Сейчас играет" : np.artist, pw - 42), x + 34, y + 16, MUTED);
+        long pos = np.position(System.currentTimeMillis()) / 1000;
+        String time = (np.playing ? "▶ " : "❚❚ ") + pos / 60 + ":" + two((int) (pos % 60));
+        text(g, font, time, x + pw - 6 - width(font, time), y + 6, MUTED);
+        int bar = pw - 42;
+        g.fill(x + 34, y + 28, x + 34 + bar, y + 29, 0x30FFFFFF);
+        int done = np.lines != null && !np.lines.isEmpty()
+                ? (int) Math.min(bar, bar * (pos * 1000) / Math.max(1, np.lines.get(np.lines.size() - 1).t + 4000)) : 0;
+        g.fill(x + 34, y + 28, x + 34 + done, y + 29, accent);
+    }
+
+    private static void rounded(GuiGraphics g, int x, int y, int w, int h, int c) {
+        g.fill(x + 2, y, x + w - 2, y + 1, c);
+        g.fill(x + 1, y + 1, x + w - 1, y + 2, c);
+        g.fill(x, y + 2, x + w, y + h - 2, c);
+        g.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, c);
+        g.fill(x + 2, y + h - 1, x + w - 2, y + h, c);
     }
 
     // ---------- pieces ----------

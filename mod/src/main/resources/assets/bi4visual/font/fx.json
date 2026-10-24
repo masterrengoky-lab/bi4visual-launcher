@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "bi4visual:font/fx.png",
+      "height": 64,
+      "ascent": 32,
+      "chars": [
+        ""
+      ]
+    }
+  ]
+}

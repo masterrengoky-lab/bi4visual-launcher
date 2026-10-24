@@ -9,7 +9,11 @@
     "LevelTimeMixin",
     "FontFilterMixin",
     "GuiMixin",
-    "TitleScreenMixin"
+    "TitleScreenMixin",
+    "FullbrightMixin",
+    "ZoomMixin",
+    "ChatMixin",
+    "AttackMixin"
   ],
   "injectors": {
     "defaultRequire": 1

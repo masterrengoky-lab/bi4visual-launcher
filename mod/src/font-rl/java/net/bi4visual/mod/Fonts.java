@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 public final class Fonts {
     private static final Style LYRICS = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "lyrics"));
     private static final Style SKY = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "sky"));
+    private static final Style FX = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "fx"));
     private static final Style HUD = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "hud"));
     private static final Style HUD_TITLE = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "hud_title"));
     private static final Style HUD_SMALL = Style.EMPTY.withFont(ResourceLocation.fromNamespaceAndPath("bi4visual", "hud_small"));
@@ -27,6 +28,11 @@ public final class Fonts {
     /** Small text for captions (assets/bi4visual/font/hud_small.json). */
     public static Component small(String text) {
         return Component.literal(text).withStyle(HUD_SMALL);
+    }
+
+    /** A ring (\ue030) or a soft dot (\ue031) for effects in the world (assets/bi4visual/font/fx.json). */
+    public static Component fx(char glyph) {
+        return Component.literal(String.valueOf(glyph)).withStyle(FX);
     }
 
     /** One tile of the sky pictures (assets/bi4visual/font/sky.json). */

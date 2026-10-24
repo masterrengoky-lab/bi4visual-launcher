@@ -24,9 +24,39 @@ public final class Config {
         public boolean toasts = true;
         /** Own main menu instead of the vanilla title screen. */
         public boolean menu = true;
+        /** Render: brighter world, zoom on a held key, own crosshair ("off", "dot", "plus", "circle"). */
+        public boolean fullbright = false;
+        public boolean zoom = true;
+        public String crosshair = "off";
+        /** Rings on the ground where the player jumps, a fading trail behind them, falling snow ("off", "light", "medium", "heavy"). */
+        public boolean jumpCircles = true;
+        public boolean trails = false;
+        public String atmosphere = "off";
+        /** Interface panels: inventory contents, coordinates, module binds, playing track. */
+        public boolean inventory = false;
+        public boolean coords = true;
+        public boolean keybinds = true;
+        public boolean media = true;
+        /** Utility: ".рщьу" typed in the Russian layout becomes "/home"; a click sound on hits. */
+        public boolean commandFix = true;
+        public boolean hitSound = false;
+        /** Colour theme for the menus and the HUD (see Themes). */
+        public String theme = "violet";
+        /** Module id to GLFW key code. Zoom is held, the rest toggle. */
+        public java.util.Map<String, Integer> binds = new java.util.HashMap<>(java.util.Map.of("zoom", 67));
+        public java.util.List<Waypoint> waypoints = new java.util.ArrayList<>();
         /** Main menu background tint (see MenuScreen.BACKGROUNDS) and how dark it is, 0–100. */
         public String menuBg = "forest";
         public int menuDim = 55;
+    }
+
+    public static final class Waypoint {
+        public String name = "";
+        public int x;
+        public int y;
+        public int z;
+        /** The level the point belongs to, from ResourceKey#toString. */
+        public String dim = "";
     }
 
     private static final Gson GSON = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
@@ -45,9 +75,48 @@ public final class Config {
         return current;
     }
 
-    /** The periwinkle highlight used across the menus and the HUD. */
+    public record Theme(String id, String name, int colour) {}
+
+    public static final java.util.List<Theme> THEMES = java.util.List.of(
+            new Theme("violet", "Violet", 0xFF8597DC),
+            new Theme("orchid", "Orchid", 0xFFB07CDB),
+            new Theme("rose", "Rose", 0xFFE07A9A),
+            new Theme("cherry", "Cherry", 0xFFE0566B),
+            new Theme("coral", "Coral", 0xFFF08A6C),
+            new Theme("peach", "Peach", 0xFFF4A97F),
+            new Theme("amber", "Amber", 0xFFF0B04A),
+            new Theme("gold", "Gold", 0xFFE6CB5A),
+            new Theme("mint", "Mint", 0xFF6CD9A8),
+            new Theme("ocean", "Ocean", 0xFF4FB3E8),
+            new Theme("sky", "Sky", 0xFF7CC4F5),
+            new Theme("snow", "Snow", 0xFFD6DCE8));
+
+    /** The highlight colour of the chosen theme, used across the menus and the HUD. */
     public static int accent() {
+        String id = get().theme;
+        for (Theme t : THEMES) {
+            if (t.id.equals(id)) return t.colour;
+        }
         return 0xFF8597DC;
+    }
+
+    /** Where named copies of the settings are kept. */
+    public static Path configsDir() {
+        return file().getParent().resolve("configs");
+    }
+
+    /** Saves the settings under a name. */
+    public static void saveAs(String name) throws java.io.IOException {
+        Files.createDirectories(configsDir());
+        Files.writeString(configsDir().resolve(name + ".json"), GSON.toJson(get()));
+    }
+
+    /** Loads settings saved under a name. */
+    public static void load(String name) throws java.io.IOException {
+        try (Reader r = Files.newBufferedReader(configsDir().resolve(name + ".json"))) {
+            Data d = GSON.fromJson(r, Data.class);
+            if (d != null) save(d);
+        }
     }
 
     public static boolean night() {

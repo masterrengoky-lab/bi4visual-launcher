@@ -16,7 +16,7 @@ public class FontFilterMixin {
     @Inject(method = "register(Lnet/minecraft/resources/Identifier;Lnet/minecraft/client/renderer/texture/AbstractTexture;)V",
             at = @At("TAIL"), require = 0)
     private void bi4visual$smooth(Identifier name, AbstractTexture texture, CallbackInfo ci) {
-        if (texture instanceof FontTexture && "bi4visual".equals(name.getNamespace()) && (name.getPath().startsWith("lyrics") || name.getPath().startsWith("hud"))) {
+        if (texture instanceof FontTexture && "bi4visual".equals(name.getNamespace()) && (name.getPath().startsWith("lyrics") || name.getPath().startsWith("hud") || name.getPath().startsWith("fx"))) {
             Smooth.linear(texture);
         }
     }
