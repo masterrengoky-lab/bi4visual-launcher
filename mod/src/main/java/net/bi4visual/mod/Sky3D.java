@@ -54,7 +54,7 @@ public final class Sky3D {
             Vector3f tangent = new Vector3f(b).mul(Mth.cos(angle)).sub(new Vector3f(a).mul(Mth.sin(angle)));
             for (int row = 0; row < 2; row++) {
                 char tile = (char) ((row == 0 ? 0xE000 : 0xE010) + i);
-                tile(sink, pose, radial.mul(RADIUS, new Vector3f()), tangent, up, size, Fonts.sky(tile), row == 0 ? -64f : 64f, ((int) (255 * visibility) << 24) | 0xFFFFFF);
+                tile(sink, pose, radial.mul(RADIUS, new Vector3f()), tangent, up, size, Fonts.sky(tile), row == 0 ? -63f : 63f, ((int) (255 * visibility) << 24) | 0xFFFFFF);
             }
         }
     }

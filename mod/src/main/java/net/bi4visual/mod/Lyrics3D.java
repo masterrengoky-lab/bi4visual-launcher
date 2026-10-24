@@ -31,9 +31,11 @@ public final class Lyrics3D {
     private static final float PIXEL = 0.075f;
     private static final long LETTER = 35;
     private static final long LETTER_IN = 520;
-    private static final long FADE_OUT = 1000;
-    /** Older pieces stay this long after a new one appears. */
-    private static final long LINGER = 1600;
+    private static final long FADE_OUT = 450;
+    /** Pieces of one line stack downwards by this many degrees. */
+    private static final float ROW_STEP = 4.2f;
+    /** At most this many pieces of a line are on screen; older ones leave first. */
+    private static final int MAX_ROWS = 2;
     /** A piece with nothing after it (an instrumental part) goes away after this. */
     private static final long MAX_LIFE = 9000;
 
@@ -72,6 +74,9 @@ public final class Lyrics3D {
     private static int lineIndex = -1;
     private static int pieceIndex = -1;
     private static int pieceCount;
+    /** Where the current line was started: all its pieces hang below this point. */
+    private static float lineYaw;
+    private static float linePitch;
     private static final java.util.Random random = new java.util.Random();
     private static float viewYaw;
     private static float viewPitch;
@@ -200,20 +205,29 @@ public final class Lyrics3D {
         return out;
     }
 
-    /** A new piece in front of the player's face; older ones linger a moment, then drift away. */
+    /**
+     * A new piece. The first piece of a line goes right where the player looks;
+     * the next pieces of the same line stack under it like subtitles, so they
+     * never cover each other. A new line clears the old one quickly.
+     */
     private static void spawn(String text, long now) {
-        for (Floating line : shown) {
-            line.dying = Math.min(line.dying, now + LINGER);
-        }
-        // Right where the player looks, a little above the crosshair; consecutive
-        // pieces step slightly up and down so they do not cover each other.
         int k = pieceCount++;
-        float yaw = viewYaw + (random.nextFloat() - 0.5f) * 6f;
-        float pitch = Mth.clamp(viewPitch + (k % 2 == 0 ? 0f : 6f), -80f, 80f);
-        float tilt = (random.nextFloat() - 0.5f) * 0.12f;
-        float size = 0.95f + random.nextFloat() * 0.2f;
-        shown.add(new Floating(text, now, yaw, pitch, tilt, size));
-        while (shown.size() > 5) {
+        if (k == 0) {
+            fadeAll(now);
+            lineYaw = viewYaw;
+            linePitch = viewPitch;
+        }
+        // Keep at most MAX_ROWS pieces of this line; the oldest leaves first.
+        int alive = 0;
+        for (int i = shown.size() - 1; i >= 0; i--) {
+            Floating f = shown.get(i);
+            if (f.dying != Long.MAX_VALUE) continue;
+            if (++alive >= MAX_ROWS) f.dying = now;
+        }
+        float pitch = Mth.clamp(linePitch + (k % MAX_ROWS) * ROW_STEP, -80f, 80f);
+        float tilt = (random.nextFloat() - 0.5f) * 0.04f;
+        shown.add(new Floating(text, now, lineYaw, pitch, tilt, 1f));
+        while (shown.size() > 6) {
             shown.remove(0);
         }
     }
@@ -243,9 +257,9 @@ public final class Lyrics3D {
             int a = (int) (255 * in * outEase);
             if (a > 4) {
                 // Fly in from further out with a little sweep; drift out the same way when leaving.
-                float radius = RADIUS + (1f - in) * 6f + (1f - outEase) * 4f;
-                float angle = (x + w / 2f) * pixel / RADIUS + (1f - in) * 0.12f;
-                float lift = (1f - outEase) * 0.6f;
+                float radius = RADIUS + (1f - in) * 1.5f + (1f - outEase) * 1.5f;
+                float angle = (x + w / 2f) * pixel / RADIUS;
+                float lift = (1f - in) * -0.25f + (1f - outEase) * 0.4f;
 
                 Vector3f radial = new Vector3f(line.forward).mul(Mth.cos(angle)).add(new Vector3f(line.right).mul(Mth.sin(angle)));
                 Vector3f tangent = new Vector3f(line.right).mul(Mth.cos(angle)).sub(new Vector3f(line.forward).mul(Mth.sin(angle)));
@@ -256,7 +270,7 @@ public final class Lyrics3D {
                 Quaternionf facing = new Quaternionf().setFromNormalized(new Matrix3f(tangent, line.up, normal));
                 float wave = 0.5f + 0.5f * Mth.sin(i * 0.45f - age / 450f);
                 int rgb = lerpColor(LIGHT, DEEP, wave);
-                float pop = 0.7f + 0.3f * easeOutBack(t);
+                float pop = 0.85f + 0.15f * easeOutBack(t);
 
                 pose.pushPose();
                 pose.translate(pos.x, pos.y, pos.z);
