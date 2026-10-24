@@ -13,9 +13,9 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 
 /**
- * Lines of the playing song floating in front of the player. The text follows
- * the view with a soft lag, each line types in letter by letter with a glow and
- * a moving gradient, and the previous line rises and fades as the next one comes.
+ * Lines of the playing song floating in front of the player. Each piece appears
+ * where the player looks and stays at that spot, types in letter by letter with a
+ * glow and a moving gradient, and rises and fades as the next one comes.
  */
 public final class Lyrics3D {
     /** Packed light for "lit by sky and block light 15", same as LightTexture.FULL_BRIGHT. */
@@ -37,14 +37,18 @@ public final class Lyrics3D {
         final List<Component> letters = new ArrayList<>();
         final long born;
         long dying = Long.MAX_VALUE;
-        /** Lines above this one, animated towards the real count. */
-        float slot;
-        int targetSlot;
-        /** Sideways shift in blocks, so neighbouring pieces do not sit on one spot. */
+        /** Shift in blocks, so neighbouring pieces do not sit on one spot. */
         final float side;
+        final float lift;
+        /** Where the player looked when the piece appeared; it stays there. */
+        final float yaw;
+        final float pitch;
 
-        Floating(String text, long born, float side) {
+        Floating(String text, long born, float side, float lift, float yaw, float pitch) {
             this.side = side;
+            this.lift = lift;
+            this.yaw = yaw;
+            this.pitch = pitch;
             text.codePoints().forEach(cp -> letters.add(Component.literal(new String(Character.toChars(cp))).withStyle(ChatFormatting.BOLD)));
             this.born = born;
         }
@@ -55,10 +59,8 @@ public final class Lyrics3D {
     private static int lineIndex = -1;
     private static int pieceIndex = -1;
     private static int pieceCount;
-    /** Where the text hangs; follows the player's view with a delay. */
-    private static float anchorYaw;
-    private static float anchorPitch;
-    private static long lastFrame;
+    private static float viewYaw;
+    private static float viewPitch;
 
     private Lyrics3D() {}
 
@@ -79,25 +81,15 @@ public final class Lyrics3D {
             return false;
         }
         long now = System.currentTimeMillis();
-        float dt = lastFrame == 0 ? 1f : Mth.clamp((now - lastFrame) / 1000f, 0f, 0.25f);
-        lastFrame = now;
         Entity viewer = mc.player;
-        boolean wasEmpty = shown.isEmpty();
+        // New pieces appear right in front, a little above the crosshair.
+        viewYaw = viewer.getYRot();
+        viewPitch = Mth.clamp(viewer.getXRot() - 6f, -80f, 80f);
         update(NowPlaying.get(), now);
         if (shown.isEmpty()) {
             return false;
         }
 
-        // Follow the view softly: right in front, a little above the crosshair.
-        float wantYaw = viewer.getYRot();
-        float wantPitch = Mth.clamp(viewer.getXRot() - 6f, -80f, 80f);
-        float k = wasEmpty ? 1f : 1f - (float) Math.exp(-dt * 3.5f);
-        anchorYaw += Mth.wrapDegrees(wantYaw - anchorYaw) * k;
-        anchorPitch += (wantPitch - anchorPitch) * k;
-        float slotK = 1f - (float) Math.exp(-dt * 6f);
-        for (Floating line : shown) {
-            line.slot += (line.targetSlot - line.slot) * slotK;
-        }
 
         // Same rotation the camera builds from the view angles (Camera#setRotation);
         // taken from the player because the camera's getters differ between versions.
@@ -107,9 +99,8 @@ public final class Lyrics3D {
         if (applyView) {
             rotate(pose, new Quaternionf(camera).conjugate());
         }
-        Vec3 dir = Vec3.directionFromRotation(anchorPitch, anchorYaw);
         for (Floating line : shown) {
-            draw(line, now, pose, sink, mc.font, camera, dir);
+            draw(line, now, pose, sink, mc.font, camera);
         }
         return true;
     }
@@ -194,22 +185,24 @@ public final class Lyrics3D {
         return out;
     }
 
-    /** The new piece appears in front; older ones move up a row and fade. */
+    /** The new piece appears in front; older ones stay put and fade a moment later. */
     private static void spawn(String text, long now) {
         for (Floating line : shown) {
-            line.targetSlot++;
             line.dying = Math.min(line.dying, now + 500);
         }
-        // Pieces of a line step a little left and right, the first one centred.
-        float side = pieceCount == 0 ? 0f : (pieceCount % 2 == 1 ? 1.4f : -1.4f);
-        pieceCount++;
-        shown.add(new Floating(text, now, side));
+        // Pieces of a line step right-down and left-up, the first one centred,
+        // so a piece never lands on top of the one before it.
+        int k = pieceCount++;
+        float side = k == 0 ? 0f : (k % 2 == 1 ? 2.2f : -2.2f);
+        float lift = k == 0 ? 0f : (k % 2 == 1 ? -LINE_GAP * 0.6f : LINE_GAP * 0.6f);
+        shown.add(new Floating(text, now, side, lift, viewYaw, viewPitch));
         while (shown.size() > 4) {
             shown.remove(0);
         }
     }
 
-    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Quaternionf camera, Vec3 dir) {
+    private static void draw(Floating line, long now, PoseStack pose, Sink sink, Font font, Quaternionf camera) {
+        Vec3 dir = Vec3.directionFromRotation(line.pitch, line.yaw);
         long age = now - line.born;
         float out = line.dying == Long.MAX_VALUE ? 1f : 1f - Mth.clamp((now - line.dying) / (float) FADE_OUT, 0f, 1f);
         float outEase = easeInOut(out);
@@ -217,12 +210,11 @@ public final class Lyrics3D {
             return;
         }
 
-        float bob = Mth.sin(age / 1300f) * 0.05f;
         pose.pushPose();
         pose.translate(dir.x * DISTANCE, dir.y * DISTANCE, dir.z * DISTANCE);
         rotate(pose, camera);
-        // Rows go up in the view, whatever the pitch.
-        pose.translate(line.side, line.slot * LINE_GAP + (1f - outEase) * 0.5f + bob, 0f);
+        // Pieces stay where they appeared; the offsets keep neighbours apart.
+        pose.translate(line.side, line.lift, 0f);
         float scale = PIXEL * (1f + (1f - outEase) * 0.06f);
         pose.scale(scale, -scale, scale);
 
