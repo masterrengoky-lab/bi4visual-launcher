@@ -10,13 +10,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Smooth filtering for the pictures of the bi4visual fonts (lyrics and sky). */
+/** Smooth filtering for the lyrics font; the sky tiles keep sharp edges so no seams show between them. */
 @Mixin(TextureManager.class)
 public class FontFilterMixin {
     @Inject(method = "register(Lnet/minecraft/resources/ResourceLocation;Lnet/minecraft/client/renderer/texture/AbstractTexture;)V",
             at = @At("TAIL"), require = 0)
     private void bi4visual$smooth(ResourceLocation name, AbstractTexture texture, CallbackInfo ci) {
-        if (texture instanceof FontTexture && "bi4visual".equals(name.getNamespace())) {
+        if (texture instanceof FontTexture && "bi4visual".equals(name.getNamespace()) && name.getPath().startsWith("lyrics")) {
             Smooth.linear(texture);
         }
     }

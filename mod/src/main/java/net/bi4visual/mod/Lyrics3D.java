@@ -107,8 +107,9 @@ public final class Lyrics3D {
 
         // Same rotation the camera builds from the view angles (Camera#setRotation);
         // taken from the player because the camera's getters differ between versions.
+        // The camera looks along its -Z, hence the half turn and the minus on the pitch.
         Quaternionf camera = new Quaternionf().rotationYXZ(
-                -viewer.getYRot() * Mth.DEG_TO_RAD, viewer.getXRot() * Mth.DEG_TO_RAD, 0f);
+                Mth.PI - viewer.getYRot() * Mth.DEG_TO_RAD, -viewer.getXRot() * Mth.DEG_TO_RAD, 0f);
         PoseStack pose = new PoseStack();
         if (applyView) {
             rotate(pose, new Quaternionf(camera).conjugate());

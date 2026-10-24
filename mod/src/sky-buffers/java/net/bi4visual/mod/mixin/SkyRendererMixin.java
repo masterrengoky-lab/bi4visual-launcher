@@ -22,10 +22,16 @@ public class SkyRendererMixin {
     @Inject(method = "renderSunMoonAndStars", at = @At("HEAD"), require = 0)
     private void bi4visual$sky(CallbackInfo ci, @Local(argsOnly = true) PoseStack pose,
                                @Local(argsOnly = true) MultiBufferSource.BufferSource buffers) {
-        Font font = Minecraft.getInstance().font;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return;
+        }
+        // Only at night, like the stars: hidden in daylight and in rain.
+        float visibility = Math.min(1f, mc.level.getStarBrightness(1f) * 2f) * (1f - mc.level.getRainLevel(1f));
+        Font font = mc.font;
         Lyrics3D.Sink sink = (p, glyph, x, y, argb, shadow) -> font.drawInBatch(glyph, x, y, argb, false,
                 p.last().pose(), buffers, Font.DisplayMode.SEE_THROUGH, 0, Lyrics3D.FULL_BRIGHT);
-        if (Sky3D.render(sink, pose)) {
+        if (Sky3D.render(sink, pose, visibility)) {
             buffers.endBatch();
         }
     }

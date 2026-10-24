@@ -21,25 +21,25 @@ public final class Sky3D {
     private Sky3D() {}
 
     /** Draws into the sky pass; the pose is camera-relative, with the view rotation applied elsewhere. */
-    public static boolean render(Lyrics3D.Sink sink, PoseStack pose) {
+    public static boolean render(Lyrics3D.Sink sink, PoseStack pose, float visibility) {
         String mode = Config.get().sky;
         boolean galaxy = "galaxy".equals(mode) || "both".equals(mode);
         boolean aurora = "aurora".equals(mode) || "both".equals(mode);
-        if (!galaxy && !aurora) {
+        if (!galaxy && !aurora || visibility < 0.02f) {
             return false;
         }
         float time = (System.currentTimeMillis() % 3_600_000L) / 1000f;
         if (galaxy) {
-            galaxy(sink, pose, time);
+            galaxy(sink, pose, time, visibility);
         }
         if (aurora) {
-            aurora(sink, pose, time);
+            aurora(sink, pose, time, visibility);
         }
         return true;
     }
 
     /** The band runs along a great circle tilted 55 degrees from the horizon and turns very slowly. */
-    private static void galaxy(Lyrics3D.Sink sink, PoseStack pose, float time) {
+    private static void galaxy(Lyrics3D.Sink sink, PoseStack pose, float time, float visibility) {
         float tilt = 55f * Mth.DEG_TO_RAD;
         float spin = time * 0.004f;
         Vector3f a = new Vector3f(Mth.cos(spin), 0f, Mth.sin(spin));
@@ -47,31 +47,31 @@ public final class Sky3D {
         Vector3f b = new Vector3f(side).mul(Mth.cos(tilt)).add(0f, Mth.sin(tilt), 0f);
         Vector3f up = new Vector3f(b).cross(a).normalize();
         float step = Mth.TWO_PI / GALAXY_TILES;
-        float size = 2f * RADIUS * Mth.sin(step / 2f) / TILE * 1.03f;
+        float size = 2f * RADIUS * Mth.sin(step / 2f) / TILE * 1.004f;
         for (int i = 0; i < GALAXY_TILES; i++) {
             float angle = (i + 0.5f) * step;
             Vector3f radial = new Vector3f(a).mul(Mth.cos(angle)).add(new Vector3f(b).mul(Mth.sin(angle)));
             Vector3f tangent = new Vector3f(b).mul(Mth.cos(angle)).sub(new Vector3f(a).mul(Mth.sin(angle)));
             for (int row = 0; row < 2; row++) {
                 char tile = (char) ((row == 0 ? 0xE000 : 0xE010) + i);
-                tile(sink, pose, radial.mul(RADIUS, new Vector3f()), tangent, up, size, Fonts.sky(tile), row == 0 ? -64f : 64f, 0xFFFFFFFF);
+                tile(sink, pose, radial.mul(RADIUS, new Vector3f()), tangent, up, size, Fonts.sky(tile), row == 0 ? -64f : 64f, ((int) (255 * visibility) << 24) | 0xFFFFFF);
             }
         }
     }
 
     /** Curtains in a ring above the horizon, swaying and breathing. */
-    private static void aurora(Lyrics3D.Sink sink, PoseStack pose, float time) {
+    private static void aurora(Lyrics3D.Sink sink, PoseStack pose, float time, float visibility) {
         Vector3f up = new Vector3f(0f, 1f, 0f);
         float step = Mth.TWO_PI / AURORA_TILES;
         float radius = RADIUS * 0.9f;
-        float size = 2f * radius * Mth.sin(step / 2f) / TILE * 1.03f;
+        float size = 2f * radius * Mth.sin(step / 2f) / TILE * 1.004f;
         for (int i = 0; i < AURORA_TILES; i++) {
             float angle = (i + 0.5f) * step + Mth.sin(time * 0.15f + i) * 0.03f;
             Vector3f radial = new Vector3f(Mth.cos(angle), 0f, Mth.sin(angle));
             Vector3f tangent = new Vector3f(-Mth.sin(angle), 0f, Mth.cos(angle));
             Vector3f pos = new Vector3f(radial).mul(radius).add(0f, radius * 0.18f, 0f);
             float breathe = 0.65f + 0.35f * Mth.sin(time * 0.6f + i * 1.7f);
-            int a = (int) (255 * breathe);
+            int a = (int) (255 * breathe * visibility);
             tile(sink, pose, pos, tangent, up, size, Fonts.sky((char) (0xE020 + i)), -64f, (a << 24) | 0xFFFFFF);
         }
     }
