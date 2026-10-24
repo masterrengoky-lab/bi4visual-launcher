@@ -1,10 +1,10 @@
 name: KissLauncherVis
 
-# A tag kiss-vX.Y.Z publishes a release with the Windows installer and the
-# .bat that downloads and installs it.
+# Every push publishes release kiss-v<version> with the Windows installer and
+# the .bat that downloads and installs it.
 on:
   push:
-    tags: ["kiss-v*"]
+    branches: [kisslaunchervis]
   workflow_dispatch:
 
 permissions:
@@ -101,21 +101,22 @@ jobs:
           merge-multiple: true
           path: src-tauri/resources/mods
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Azure app id for Microsoft sign-in. Without it only offline accounts work.
           BI4VISUAL_MS_CLIENT_ID: ${{ secrets.BI4VISUAL_MS_CLIENT_ID }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: KissLauncherVis ${{ github.ref_name }}
+          tagName: kiss-v__VERSION__
+          releaseName: KissLauncherVis v__VERSION__
+          releaseCommitish: ${{ github.sha }}
           releaseBody: Скачайте KissLauncherVis.bat и запустите его двойным кликом. Он сам скачает установщик, поставит лаунчер и откроет его.
           releaseDraft: false
       - name: Attach the .bat
-        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.ref_name }}" scripts/KissLauncherVis.bat --clobber
+        run: gh release upload "kiss-v${{ steps.tauri.outputs.appVersion }}" scripts/KissLauncherVis.bat --clobber
       - uses: actions/upload-artifact@v4
         with:
           name: KissLauncherVis-windows
