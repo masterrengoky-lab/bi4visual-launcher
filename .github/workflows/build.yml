@@ -66,6 +66,12 @@ jobs:
           for j in $(find ~/.gradle .gradle -name "*.jar" -size +5M 2>/dev/null | grep -i minecraft); do
             if unzip -l "$j" | grep -q "net/minecraft/client/renderer/LevelRenderer.class"; then jar=$j; break; fi
           done
+          for c in net.minecraft.client.gui.Gui net.minecraft.client.gui.GuiGraphics net.minecraft.client.gui.screens.TitleScreen net.minecraft.client.gui.screens.Screen; do
+            out=$(javap -p -cp "$jar" $c 2>&1 | grep -E "\(" | grep -v lambda | grep -iE "render|fill|drawString|blur|init|text|Panorama|pose|scissor|gradient" | sed 's/^ *//' | tr '\n' '~')
+            echo "::notice::$mc $c: ${out:0:3800}"
+          done
+          gg=$(unzip -l "$jar" | grep -oE "net/minecraft/client/gui/[A-Za-z]*Graphics[A-Za-z]*.class" | sort -u | tr '\n' ' ')
+          echo "::notice::$mc graphics classes: $gg"
           if javap -p -cp "$jar" net.minecraft.client.renderer.LevelRenderer | grep -q " $hook("; then
             echo "LevelRenderer.$hook найден"
           else
