@@ -10,6 +10,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// The track as the system reports it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Track {
+    /// The player's app id, e.g. Spotify.exe; shown in the log.
+    pub app: String,
     pub title: String,
     pub artist: String,
     pub playing: bool,
@@ -42,9 +44,9 @@ pub async fn watch(client: reqwest::Client, game_dir: PathBuf, stop: Arc<AtomicB
                     let lines = match lyrics::fetch(&client, &t.title, &t.artist, t.duration_ms).await {
                         Ok(lines) => {
                             log(if lines.is_empty() {
-                                format!("Играет «{} — {}», но в базе LRCLIB нет синхронного текста", t.artist, t.title)
+                                format!("Играет «{} — {}» ({}), но в базе LRCLIB нет синхронного текста", t.artist, t.title, t.app)
                             } else {
-                                format!("Играет «{} — {}», текст найден: {} строк", t.artist, t.title, lines.len())
+                                format!("Играет «{} — {}» ({}), текст найден: {} строк", t.artist, t.title, t.app, lines.len())
                             });
                             lines
                         }
@@ -83,11 +85,15 @@ pub async fn watch(client: reqwest::Client, game_dir: PathBuf, stop: Arc<AtomicB
                 if silent_rounds == 20 {
                     log("Не вижу играющей музыки. Нужен плеер, который показывает трек в регуляторе громкости Windows".into());
                 }
-                if written {
-                    lyrics::clear(&game_dir);
-                    written = false;
+                // Players drop out of the list for a moment when switching tracks;
+                // only take the lyrics away after five seconds of silence.
+                if silent_rounds >= 10 {
+                    if written {
+                        lyrics::clear(&game_dir);
+                        written = false;
+                    }
+                    np = NowPlaying::default();
                 }
-                np = NowPlaying::default();
             }
         }
         if changed && lyrics::write(&game_dir, &np).is_ok() {
@@ -107,11 +113,21 @@ fn current() -> Option<Track> {
     };
 
     let manager = Manager::RequestAsync().ok()?.join().ok()?;
-    let session = manager.GetCurrentSession().ok()?;
+    // Windows' "current" session is often a paused player in the background
+    // (say Spotify while Yandex Music plays), so prefer one that is playing.
+    let is_playing = |s: &windows::Media::Control::GlobalSystemMediaTransportControlsSession| {
+        s.GetPlaybackInfo().and_then(|i| i.PlaybackStatus()).map(|st| st == Status::Playing).unwrap_or(false)
+    };
+    let sessions = manager.GetSessions().ok()?;
+    let session = (0..sessions.Size().unwrap_or(0))
+        .filter_map(|i| sessions.GetAt(i).ok())
+        .find(|s| is_playing(s))
+        .or_else(|| manager.GetCurrentSession().ok())?;
+    let app = session.SourceAppUserModelId().map(|a| a.to_string_lossy()).unwrap_or_default();
     let props = session.TryGetMediaPropertiesAsync().ok()?.join().ok()?;
     let title = props.Title().ok()?.to_string_lossy();
     let artist = props.Artist().map(|a| a.to_string_lossy()).unwrap_or_default();
-    let playing = session.GetPlaybackInfo().ok()?.PlaybackStatus().ok()? == Status::Playing;
+    let playing = is_playing(&session);
 
     let timeline = session.GetTimelineProperties().ok()?;
     // TimeSpan and DateTime count 100 ns ticks; DateTime starts in 1601.
@@ -126,7 +142,7 @@ fn current() -> Option<Track> {
     } else {
         Some(pos)
     };
-    Some(Track { title, artist, playing, position_ms, duration_ms: end })
+    Some(Track { app, title, artist, playing, position_ms, duration_ms: end })
 }
 
 #[cfg(not(windows))]
