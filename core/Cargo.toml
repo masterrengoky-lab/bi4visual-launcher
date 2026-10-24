@@ -1,6 +1,6 @@
 [package]
-name = "bi4visual-core"
-description = "Minecraft install and launch logic for bi4visual launcher"
+name = "kiss-core"
+description = "Minecraft install and launch logic for KissLauncherVis"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

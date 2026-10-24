@@ -21,7 +21,7 @@ pub struct Job {
 
 pub fn client() -> reqwest::Client {
     reqwest::Client::builder()
-        .user_agent(concat!("bi4visual-launcher/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("KissLauncherVis/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(std::time::Duration::from_secs(15))
         .build()
         .expect("http client")

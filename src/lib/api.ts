@@ -19,7 +19,17 @@ export type Settings = {
   sky: "galaxy" | "aurora" | "both" | "off";
   always_night: boolean;
   cosmetics: string[];
+  language: Lang;
+  curseforge_key: string | null;
 };
+
+export type Lang = "ru" | "en" | "uk";
+export type Source = "modrinth" | "curseforge";
+export type Kind = "mod" | "modpack" | "resourcepack";
+export type Sort = "relevance" | "downloads" | "updated" | "newest";
+export type PackFile = { file_name: string; enabled: boolean };
+export type Friend = { name: string; uuid: string | null; note: string; added: number };
+export type SavedSkin = { id: string; name: string; slim: boolean; added: number; data_url: string };
 
 export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge";
 export type Instance = {
@@ -31,6 +41,7 @@ export type Instance = {
   icon_url: string | null;
   last_played: number | null;
   playtime_secs: number;
+  mods: { project_id: string; file_name: string; title: string }[];
 };
 export type Instances = { instances: Instance[]; selected: string | null };
 export type ModFile = { file_name: string; enabled: boolean; title: string; project_id: string | null; icon_url: string | null };
@@ -74,10 +85,27 @@ export const api = {
   mods: (instance: string) => invoke<ModFile[]>("mods_list", { instance }),
   toggleMod: (instance: string, file: string, enabled: boolean) => invoke<void>("mod_toggle", { instance, file, enabled }),
   removeMod: (instance: string, file: string) => invoke<void>("mod_remove", { instance, file }),
-  search: (query: string, kind: "mod" | "modpack", instance: string | null, offset = 0) =>
-    invoke<SearchResult>("modrinth_search", { query, kind, instance, offset }),
-  installMod: (instance: string, project: string) => invoke<string[]>("modrinth_install_mod", { instance, project }),
+  search: (source: Source, query: string, kind: Kind, instance: string | null, sort: Sort, offset = 0) =>
+    invoke<SearchResult>("catalog_search", { source, query, kind, instance, sort, offset }),
+  install: (kind: Kind, instance: string, project: string) => invoke<string[]>("catalog_install", { kind, instance, project }),
   installPack: (project: string) => invoke<Instances>("modrinth_install_pack", { project }),
+  renameInstance: (id: string, name: string) => invoke<Instances>("instance_rename", { id, name }),
+  duplicateInstance: (id: string) => invoke<Instances>("instance_duplicate", { id }),
+
+  packs: (instance: string) => invoke<PackFile[]>("resourcepacks_list", { instance }),
+  togglePack: (instance: string, file: string, enabled: boolean) => invoke<void>("resourcepack_toggle", { instance, file, enabled }),
+  removePack: (instance: string, file: string) => invoke<void>("resourcepack_remove", { instance, file }),
+
+  savedSkins: () => invoke<SavedSkin[]>("skin_library_list"),
+  saveSkin: (name: string, png: number[], slim: boolean) => invoke<SavedSkin[]>("skin_library_add", { name, png, slim }),
+  saveSkinOf: (name: string) => invoke<SavedSkin[]>("skin_library_add_name", { name }),
+  removeSavedSkin: (id: string) => invoke<SavedSkin[]>("skin_library_remove", { id }),
+  applySavedSkin: (account: string, id: string) => invoke<Accounts>("skin_apply_saved", { account, id }),
+  applySkinOf: (account: string, name: string) => invoke<Accounts>("skin_apply_name", { account, name }),
+
+  friends: () => invoke<Friend[]>("friends_list"),
+  addFriend: (name: string) => invoke<Friend[]>("friend_add", { name }),
+  removeFriend: (name: string) => invoke<Friend[]>("friend_remove", { name }),
 
   accounts: () => invoke<Accounts>("accounts_list"),
   addOffline: (name: string) => invoke<Accounts>("account_add_offline", { name }),
@@ -100,26 +128,10 @@ export function errorText(e: unknown): string {
   return typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
 }
 
-export const STAGE_NAMES: Record<string, string> = {
-  libraries: "Загрузка игры",
-  assets: "Загрузка ресурсов",
-  java: "Загрузка Java",
-  loader: "Установка загрузчика модов",
-  mods: "Загрузка модов",
-  modpack: "Загрузка модпака",
-};
-
-export const LOADER_NAMES: Record<Loader, string> = {
-  vanilla: "Без модов",
-  fabric: "Fabric",
-  quilt: "Quilt",
-  forge: "Forge",
-  neoforge: "NeoForge",
-};
-
-export function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(".0", "")} млн`;
-  if (n >= 1000) return `${Math.round(n / 1000)} тыс.`;
+export function formatCount(n: number, lang: Lang): string {
+  const [m, k] = lang === "en" ? ["M", "K"] : lang === "uk" ? ["млн", "тис."] : ["млн", "тыс."];
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(".0", "")}${lang === "en" ? "" : " "}${m}`;
+  if (n >= 1000) return `${Math.round(n / 1000)}${lang === "en" ? "" : " "}${k}`;
   return String(n);
 }
 
@@ -131,4 +143,8 @@ export function readAsDataUrl(file: File): Promise<string> {
     r.onerror = () => reject(r.error);
     r.readAsDataURL(file);
   });
+}
+
+export async function readBytes(file: File): Promise<number[]> {
+  return Array.from(new Uint8Array(await file.arrayBuffer()));
 }

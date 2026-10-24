@@ -16,7 +16,7 @@ pub struct Skin {
     pub slim: bool,
 }
 
-fn data_url(png: &[u8]) -> String {
+pub fn data_url(png: &[u8]) -> String {
     format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(png))
 }
 
@@ -51,6 +51,33 @@ struct TextureRef {
 
 /// The skin of a licensed profile, from Mojang's session server.
 async fn licensed_skin(client: &reqwest::Client, uuid: &str) -> Result<Option<Skin>> {
+    Ok(licensed_png(client, uuid).await?.map(|(png, slim)| Skin { data_url: data_url(&png), slim }))
+}
+
+#[derive(Deserialize)]
+struct NameLookup {
+    id: String,
+    name: String,
+}
+
+/// UUID and exact spelling of a licensed nickname, or `None` if nobody has it.
+pub async fn lookup_name(client: &reqwest::Client, name: &str) -> Result<Option<(String, String)>> {
+    let resp = client.get(format!("https://api.mojang.com/users/profiles/minecraft/{name}")).send().await?;
+    if resp.status() == reqwest::StatusCode::NOT_FOUND || resp.status() == reqwest::StatusCode::NO_CONTENT {
+        return Ok(None);
+    }
+    let p: NameLookup = resp.error_for_status()?.json().await?;
+    Ok(Some((p.id, p.name)))
+}
+
+/// The skin PNG of a licensed nickname and whether it has slim arms.
+pub async fn skin_of_name(client: &reqwest::Client, name: &str) -> Result<(String, Vec<u8>, bool)> {
+    let (uuid, exact) = lookup_name(client, name).await?.ok_or_else(|| anyhow!("Игрока {name} нет среди лицензионных аккаунтов"))?;
+    let (png, slim) = licensed_png(client, &uuid).await?.ok_or_else(|| anyhow!("У {exact} стандартный скин"))?;
+    Ok((exact, png, slim))
+}
+
+async fn licensed_png(client: &reqwest::Client, uuid: &str) -> Result<Option<(Vec<u8>, bool)>> {
     let profile: SessionProfile =
         crate::download::get_json(client, &format!("https://sessionserver.mojang.com/session/minecraft/profile/{uuid}")).await?;
     let Some(prop) = profile.properties.iter().find(|p| p.name == "textures") else { return Ok(None) };
@@ -63,7 +90,7 @@ async fn licensed_skin(client: &reqwest::Client, uuid: &str) -> Result<Option<Sk
         .and_then(|m| m["model"].as_str())
         .is_some_and(|m| m == "slim");
     let png = client.get(skin.url.replace("http://", "https://")).send().await?.error_for_status()?.bytes().await?;
-    Ok(Some(Skin { data_url: data_url(&png), slim }))
+    Ok(Some((png.to_vec(), slim)))
 }
 
 /// Offline players see a default skin in game. Mojang picks it from the UUID:
@@ -119,8 +146,8 @@ pub fn remove_custom(paths: &Paths, acc: &Account) {
     let _ = std::fs::remove_file(custom_path(paths, &acc.id));
 }
 
-const PACK_DIR: &str = "bi4visual-skin";
-const PACK_ID: &str = "file/bi4visual-skin";
+const PACK_DIR: &str = "kissvis-skin";
+const PACK_ID: &str = "file/kissvis-skin";
 
 /// Default skin textures in every Minecraft version, wide and slim.
 fn default_texture_paths() -> Vec<String> {
@@ -151,14 +178,14 @@ pub fn apply_pack(paths: &Paths, acc: &Account, game_dir: &std::path::Path) -> R
         }
         std::fs::write(
             pack.join("pack.mcmeta"),
-            r#"{"pack":{"pack_format":15,"supported_formats":[1,99],"description":"Скин из bi4visual launcher"}}"#,
+            r#"{"pack":{"pack_format":15,"supported_formats":[1,99],"description":"Скин из KissLauncherVis"}}"#,
         )?;
     }
-    set_pack_enabled(&game_dir.join("options.txt"), enable)
+    set_pack_enabled(&game_dir.join("options.txt"), PACK_ID, enable)
 }
 
-/// Adds or removes our pack in the `resourcePacks:[...]` line of options.txt.
-fn set_pack_enabled(options: &std::path::Path, enable: bool) -> Result<()> {
+/// Adds or removes a pack in the `resourcePacks:[...]` line of options.txt.
+pub(crate) fn set_pack_enabled(options: &std::path::Path, pack_id: &str, enable: bool) -> Result<()> {
     let text = std::fs::read_to_string(options).unwrap_or_default();
     let mut found = false;
     let mut lines: Vec<String> = text
@@ -167,9 +194,9 @@ fn set_pack_enabled(options: &std::path::Path, enable: bool) -> Result<()> {
             let Some(list) = line.strip_prefix("resourcePacks:") else { return line.to_string() };
             found = true;
             let mut packs: Vec<String> = serde_json::from_str(list).unwrap_or_else(|_| vec!["vanilla".into()]);
-            packs.retain(|p| p != PACK_ID);
+            packs.retain(|p| p != pack_id);
             if enable {
-                packs.push(PACK_ID.into());
+                packs.push(pack_id.into());
             }
             format!("resourcePacks:{}", serde_json::to_string(&packs).unwrap_or_default())
         })
@@ -178,7 +205,7 @@ fn set_pack_enabled(options: &std::path::Path, enable: bool) -> Result<()> {
         if !enable {
             return Ok(());
         }
-        lines.push(format!("resourcePacks:[\"vanilla\",\"{PACK_ID}\"]"));
+        lines.push(format!("resourcePacks:[\"vanilla\",\"{pack_id}\"]"));
     }
     crate::paths::ensure_parent(options)?;
     std::fs::write(options, lines.join("\n") + "\n")?;
@@ -269,15 +296,15 @@ mod tests {
 
         apply_pack(&paths, &acc, &game).unwrap();
         let opts = std::fs::read_to_string(game.join("options.txt")).unwrap();
-        assert!(opts.contains(r#"resourcePacks:["vanilla","file/bi4visual-skin"]"#));
+        assert!(opts.contains(r#"resourcePacks:["vanilla","file/kissvis-skin"]"#));
         assert!(opts.contains("fov:0.0"));
-        assert!(game.join("resourcepacks/bi4visual-skin/assets/minecraft/textures/entity/player/wide/steve.png").exists());
+        assert!(game.join("resourcepacks/kissvis-skin/assets/minecraft/textures/entity/player/wide/steve.png").exists());
 
         acc.custom_skin_slim = None;
         apply_pack(&paths, &acc, &game).unwrap();
         let opts = std::fs::read_to_string(game.join("options.txt")).unwrap();
         assert!(opts.contains(r#"resourcePacks:["vanilla"]"#));
-        assert!(!game.join("resourcepacks/bi4visual-skin").exists());
+        assert!(!game.join("resourcepacks/kissvis-skin").exists());
     }
 
     #[test]

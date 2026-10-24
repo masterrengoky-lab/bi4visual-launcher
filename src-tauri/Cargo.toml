@@ -1,19 +1,19 @@
 [package]
-name = "bi4visual-launcher"
-description = "bi4visual launcher — лаунчер Minecraft"
+name = "kisslaunchervis"
+description = "KissLauncherVis — лаунчер Minecraft"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
-name = "bi4visual_launcher_lib"
+name = "kisslaunchervis_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-bi4visual-core = { path = "../core" }
+kiss-core = { path = "../core" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true

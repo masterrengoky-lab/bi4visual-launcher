@@ -1,37 +1,51 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  api,
-  on,
-  errorText,
-  LOADER_NAMES,
-  STAGE_NAMES,
-  type Accounts,
-  type GameState,
-  type Instances,
-  type Progress,
-  type Settings,
-  type Skin,
-} from "./lib/api";
-import TitleBar from "./components/TitleBar";
-import Backdrop from "./components/Backdrop";
-import SkinViewer from "./components/SkinViewer";
-import Avatar from "./components/Avatar";
-import InstanceIcon from "./components/InstanceIcon";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { api, on, errorText, type Accounts, type GameState, type Instances, type Lang, type Progress, type Settings, type Skin } from "./lib/api";
+import { I18n, translator, type Key } from "./lib/i18n";
+import * as I from "./components/Icons";
 import AccountsModal from "./components/AccountsModal";
-import SettingsModal from "./components/SettingsModal";
 import LogModal from "./components/LogModal";
-import InstancesPanel from "./components/InstancesPanel";
-import ModsPanel from "./components/ModsPanel";
-import ModpacksPanel from "./components/ModpacksPanel";
-import SkinPanel from "./components/SkinPanel";
-import FeaturedPacks from "./components/FeaturedPacks";
-import SkinFront from "./components/SkinFront";
-import { BookArt, ChestArt, GrassBlockArt } from "./components/PixelArt";
-import { EMOTES, type EmoteKind } from "./lib/livelyAnimation";
+import Home from "./pages/Home";
+import Cosmetics from "./pages/Cosmetics";
+import Skins from "./pages/Skins";
+import Catalog from "./pages/Catalog";
+import Builds from "./pages/Builds";
+import Friends from "./pages/Friends";
+import SettingsPage from "./pages/Settings";
 
-type ModalName = "accounts" | "settings" | "log" | "instances" | "mods" | "modpacks" | "skin" | null;
+export type Page = "home" | "cosmetics" | "skins" | "mods" | "packs" | "builds" | "friends" | "settings";
+
+const NAV: { id: Page; key: Key; icon: (p: { size?: number }) => JSX.Element }[] = [
+  { id: "home", key: "nav.home", icon: I.Home },
+  { id: "cosmetics", key: "nav.cosmetics", icon: I.Palette },
+  { id: "skins", key: "nav.skins", icon: I.User },
+  { id: "mods", key: "nav.mods", icon: I.Puzzle },
+  { id: "packs", key: "nav.packs", icon: I.Image },
+  { id: "builds", key: "nav.builds", icon: I.Layers },
+  { id: "friends", key: "nav.friends", icon: I.Users },
+];
 
 const MAX_LOG = 2000;
+
+/** Everything the pages share. */
+export type Shared = {
+  settings: Settings;
+  saveSettings: (s: Settings) => Promise<void>;
+  accounts: Accounts;
+  setAccounts: (a: Accounts) => void;
+  instances: Instances;
+  setInstances: (i: Instances) => void;
+  skin: Skin | null;
+  reloadSkin: () => void;
+  background: string | null;
+  setBackground: (b: string | null) => void;
+  game: GameState["state"];
+  progress: Progress | null;
+  play: () => void;
+  openAccounts: () => void;
+  openLog: () => void;
+  go: (p: Page) => void;
+};
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -39,13 +53,16 @@ export default function App() {
   const [instances, setInstances] = useState<Instances | null>(null);
   const [skin, setSkin] = useState<Skin | null>(null);
   const [background, setBackground] = useState<string | null>(null);
-  const [modal, setModal] = useState<ModalName>(null);
+  const [page, setPage] = useState<Page>("home");
+  const [modal, setModal] = useState<"accounts" | "log" | null>(null);
   const [game, setGame] = useState<GameState["state"]>("stopped");
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
-  const [emote, setEmote] = useState<{ kind: EmoteKind; n: number } | null>(null);
-  const [emoteMenu, setEmoteMenu] = useState(false);
+
+  const lang: Lang = settings?.language ?? "ru";
+  const i18n = useMemo(() => ({ t: translator(lang), lang }), [lang]);
+  const { t } = i18n;
 
   useEffect(() => {
     api.getSettings().then(setSettings);
@@ -59,27 +76,17 @@ export default function App() {
         setGame(s.state);
         if (s.state !== "installing") setProgress(null);
         if (s.state === "stopped") api.instances().then(setInstances);
-        if (s.state === "stopped" && s.code !== null && s.code !== 0) {
-          setError(`Игра закрылась с ошибкой (код ${s.code}).`);
-        }
+        if (s.state === "stopped" && s.code !== null && s.code !== 0) setError(`crash:${s.code}`);
       }),
     ];
     return () => subs.forEach((p) => p.then((off) => off()));
   }, []);
 
-  const stageRef = useRef<HTMLElement>(null);
-  const [stageSize, setStageSize] = useState({ w: 380, h: 400 });
   useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setStageSize({ w: Math.floor(e.contentRect.width), h: Math.max(200, Math.floor(e.contentRect.height)) }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const account = accounts?.accounts.find((a) => a.id === accounts.selected) ?? null;
-  const instance = instances?.instances.find((i) => i.id === instances.selected) ?? null;
-
   const reloadSkin = useCallback(() => {
     if (!account) return setSkin(null);
     api.skin(account.id).then(setSkin, () => setSkin(null));
@@ -88,242 +95,114 @@ export default function App() {
 
   async function play() {
     setError(null);
-    if (!account) {
-      setModal("accounts");
-      return;
-    }
+    if (!account) return setModal("accounts");
     setLog([]);
     try {
       await api.play();
-      // The very first Play creates an instance; show it.
       setInstances(await api.instances());
     } catch (e) {
       setError(errorText(e));
     }
   }
 
-  async function updateSettings(next: Settings) {
+  async function saveSettings(next: Settings) {
     setSettings(next);
     await api.saveSettings(next);
   }
 
-  const busy = game !== "stopped";
-  const percent = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null;
-  const close = () => setModal(null);
+  if (!settings || !accounts || !instances) {
+    return (
+      <div className="app loading">
+        <WindowButtons />
+      </div>
+    );
+  }
+
+  const shared: Shared = {
+    settings,
+    saveSettings,
+    accounts,
+    setAccounts,
+    instances,
+    setInstances,
+    skin,
+    reloadSkin,
+    background,
+    setBackground,
+    game,
+    progress,
+    play,
+    openAccounts: () => setModal("accounts"),
+    openLog: () => setModal("log"),
+    go: setPage,
+  };
 
   return (
-    <div className="app">
-      <Backdrop
-        image={background}
-        dim={settings?.bg_dim ?? 45}
-        blur={settings?.bg_blur ?? 3}
-        particles={settings?.particles ?? true}
-      />
-      <TitleBar />
-
-      <div className="layout">
-        <nav className="side">
-          <Tile title="Сборки" color="violet" onClick={() => setModal("instances")}>
-            <ChestArt className="tile-art chest" />
-          </Tile>
-          <Tile title="Мой скин" color="blue" onClick={() => setModal("skin")}>
-            <SkinFront className="tile-art skin" skin={skin?.data_url ?? null} slim={skin?.slim ?? false} />
-          </Tile>
-          <Tile title="Моды" color="green" onClick={() => setModal("mods")}>
-            <BookArt className="tile-art book" />
-          </Tile>
-          <Tile title="Модпаки" color="orange" onClick={() => setModal("modpacks")}>
-            <GrassBlockArt className="tile-art grass" />
-          </Tile>
-        </nav>
-
-        <header className="topbar">
-          <button className="hud account-chip" onClick={() => setModal("accounts")}>
-            {account ? (
-              <>
-                <Avatar uuid={account.uuid} name={account.name} />
-                <span className="account-text">
-                  <b>{account.name}</b>
-                  <small>{account.kind === "microsoft" ? "Лицензия" : "Офлайн-ник"}</small>
-                </span>
-              </>
-            ) : (
-              <span className="account-text">
-                <b>Войти</b>
-                <small>Добавьте аккаунт</small>
-              </span>
-            )}
-            <span className="chevron">⌄</span>
-          </button>
-          <button className="hud square" title="Журнал игры" onClick={() => setModal("log")}>
-            <BugIcon />
-          </button>
-          <button className="hud square" title="Настройки" onClick={() => setModal("settings")}>
-            <GearIcon />
-          </button>
-        </header>
-
-        <main className="stage" ref={stageRef}>
-          <div className="stage-glow" aria-hidden />
-          <SkinViewer
-            skin={skin?.data_url ?? null}
-            slim={skin?.slim ?? false}
-            width={Math.min(420, stageSize.w)}
-            height={stageSize.h}
-            walking={game === "installing"}
-            cosmetics={settings?.cosmetics}
-            emote={emote}
-          />
-          <div className="emote-dock">
-            {emoteMenu && (
-              <div className="emote-menu">
-                {EMOTES.map((e) => (
-                  <button
-                    key={e.kind}
-                    onClick={() => {
-                      setEmote((cur) => ({ kind: e.kind, n: (cur?.n ?? 0) + 1 }));
-                      setEmoteMenu(false);
-                    }}
-                  >
-                    <span>{e.icon}</span>
-                    {e.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button className="hud square emote-btn" title="Эмоции" onClick={() => setEmoteMenu((v) => !v)}>
-              😀
+    <I18n.Provider value={i18n}>
+      <div className="app">
+        <aside className="sidebar">
+          <div className="brand" data-tauri-drag-region>
+            <img src="/logo.svg" alt="" width={38} height={38} />
+            <span>KissLauncher<em>Vis</em></span>
+          </div>
+          <nav className="nav">
+            {NAV.map((n) => (
+              <button key={n.id} className={`nav-item${page === n.id ? " active" : ""}`} onClick={() => setPage(n.id)}>
+                <n.icon size={21} />
+                {t(n.key)}
+              </button>
+            ))}
+          </nav>
+          <div className="nav-bottom">
+            <button className={`nav-item${page === "settings" ? " active" : ""}`} onClick={() => setPage("settings")}>
+              <I.Gear size={21} />
+              {t("nav.settings")}
             </button>
           </div>
+        </aside>
+
+        <main className={`page page-${page}`} key={page}>
+          <div className="drag-strip" data-tauri-drag-region />
+          {page === "home" && <Home {...shared} />}
+          {page === "cosmetics" && <Cosmetics {...shared} />}
+          {page === "skins" && <Skins {...shared} />}
+          {page === "mods" && <Catalog {...shared} kind="mod" />}
+          {page === "packs" && <Catalog {...shared} kind="resourcepack" />}
+          {page === "builds" && <Builds {...shared} />}
+          {page === "friends" && <Friends {...shared} />}
+          {page === "settings" && <SettingsPage {...shared} />}
         </main>
 
-        <div className="right">
-          <FeaturedPacks busy={busy} onInstalled={setInstances} />
-        </div>
+        <WindowButtons />
 
-        <footer className="play-area">
-          {error && (
-            <div className="error-banner" role="alert">
-              <span>{error}</span>
-              {log.length > 0 && <button onClick={() => setModal("log")}>Журнал</button>}
-              <button onClick={() => setError(null)} aria-label="Закрыть">✕</button>
-            </div>
-          )}
-          <div className="quick-row">
-            <button className="mc-btn dark" onClick={() => setModal("mods")}>🧩 Моды сборки</button>
-            <button className="mc-btn dark" disabled={!instance} onClick={() => instance && api.openInstanceDir(instance.id)}>
-              📁 Папка сборки
-            </button>
+        {error && (
+          <div className="toast error" role="alert">
+            <span>{error.startsWith("crash:") ? t("home.crashed", { code: error.slice(6) }) : error}</span>
+            {log.length > 0 && <button className="btn small" onClick={() => setModal("log")}>{t("common.log")}</button>}
+            <button className="icon-btn" onClick={() => setError(null)} aria-label={t("common.close")}><I.X size={16} /></button>
           </div>
-          <div className="play-row">
-            <button className="instance-card" disabled={busy} onClick={() => setModal("instances")}>
-              <InstanceIcon instance={instance} size={84} />
-              <span className="instance-text">
-                <small>▤ Сборка</small>
-                <b>{instance?.name ?? "Последняя версия"}</b>
-                <span>{instance ? `${instance.game_version} · ${LOADER_NAMES[instance.loader]}` : "Создастся при первом запуске"}</span>
-              </span>
-            </button>
-            <div className="play-col">
-              <button className="play-btn" disabled={busy} onClick={play}>
-                <span className="play-main">
-                  <span className="play-icon">▶</span>
-                  {game === "running" ? "В игре" : game === "installing" ? "Загрузка" : "Играть"}
-                </span>
-                {progress && game === "installing" ? (
-                  <span className="play-progress">
-                    <span className="play-progress-bar" style={{ width: `${percent ?? 0}%` }} />
-                  </span>
-                ) : (
-                  <span className="play-sub">{formatPlaytime(instance?.playtime_secs ?? 0)}</span>
-                )}
-              </button>
-              <div className="play-status">
-                {progress && game === "installing"
-                  ? `${STAGE_NAMES[progress.stage] ?? progress.stage}${percent !== null && progress.total > 1 ? ` · ${percent}%` : ""}`
-                  : game === "running"
-                    ? "Игра запущена"
-                    : "\u00a0"}
-              </div>
-            </div>
-          </div>
-        </footer>
+        )}
+
+        {modal === "accounts" && <AccountsModal accounts={accounts} onChange={setAccounts} onClose={() => setModal(null)} />}
+        {modal === "log" && <LogModal lines={log} onClose={() => setModal(null)} />}
       </div>
+    </I18n.Provider>
+  );
+}
 
-      {modal === "accounts" && accounts && <AccountsModal accounts={accounts} onChange={setAccounts} onClose={close} />}
-      {modal === "settings" && settings && <SettingsModal settings={settings} background={background} onBackground={setBackground} onSave={updateSettings} onClose={close} />}
-      {modal === "log" && <LogModal lines={log} onClose={close} />}
-      {modal === "instances" && instances && settings && (
-        <InstancesPanel
-          instances={instances}
-          showSnapshots={settings.show_snapshots}
-          onSnapshots={(v) => updateSettings({ ...settings, show_snapshots: v })}
-          onChange={setInstances}
-          onClose={close}
-        />
-      )}
-      {modal === "mods" && (
-        <ModsPanel instance={instance} onCreate={() => setModal("instances")} onClose={close} />
-      )}
-      {modal === "modpacks" && (
-        <ModpacksPanel
-          busy={busy}
-          onInstalled={(i) => {
-            setInstances(i);
-            close();
-          }}
-          onClose={close}
-        />
-      )}
-      {modal === "skin" && (
-        <SkinPanel
-          account={account}
-          skin={skin}
-          cosmetics={settings?.cosmetics ?? []}
-          onCosmetics={(c) => settings && updateSettings({ ...settings, cosmetics: c })}
-          onChanged={(a) => (a ? setAccounts(a) : reloadSkin())}
-          onAccounts={() => setModal("accounts")}
-          onClose={close}
-        />
-      )}
+function WindowButtons() {
+  const win = getCurrentWindow();
+  return (
+    <div className="window-buttons">
+      <button onClick={() => win.minimize()} aria-label="minimize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" strokeWidth="1.2" /></svg>
+      </button>
+      <button onClick={() => win.toggleMaximize()} aria-label="maximize">
+        <svg width="12" height="12" viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>
+      </button>
+      <button className="close" onClick={() => win.close()} aria-label="close">
+        <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" strokeWidth="1.2" /></svg>
+      </button>
     </div>
-  );
-}
-
-function Tile({ title, color, onClick, children }: { title: string; color: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button className={`tile tile-${color}`} onClick={onClick}>
-      <span className="tile-art-wrap">{children}</span>
-      <span className="tile-label">{title}</span>
-    </button>
-  );
-}
-
-function formatPlaytime(secs: number): string {
-  if (secs < 60) return "ещё не играли";
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return h > 0 ? `${h} ч ${m} мин` : `${m} мин`;
-}
-
-function BugIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 16 16" shapeRendering="crispEdges" fill="currentColor" aria-hidden>
-      <rect x="6" y="2" width="4" height="2" />
-      <rect x="4" y="4" width="8" height="9" />
-      <rect x="2" y="5" width="2" height="1" /><rect x="12" y="5" width="2" height="1" />
-      <rect x="1" y="8" width="3" height="1" /><rect x="12" y="8" width="3" height="1" />
-      <rect x="2" y="11" width="2" height="1" /><rect x="12" y="11" width="2" height="1" />
-      <rect x="7.5" y="5" width="1" height="7" fill="#17151f" />
-    </svg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-    </svg>
   );
 }

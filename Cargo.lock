@@ -241,44 +241,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
-name = "bi4visual-core"
-version = "0.9.3"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "dirs 5.0.1",
- "flate2",
- "futures",
- "hex",
- "md5",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha1",
- "tar",
- "tempfile",
- "tokio",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "bi4visual-launcher"
-version = "0.9.3"
-dependencies = [
- "anyhow",
- "bi4visual-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tokio",
- "windows",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2056,6 +2018,44 @@ checksum = "0fbe853b403ae61a04233030ae8a79d94975281ed9770a1f9e246732b534b28d"
 dependencies = [
  "bitflags 2.13.2",
  "serde",
+]
+
+[[package]]
+name = "kiss-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "dirs 5.0.1",
+ "flate2",
+ "futures",
+ "hex",
+ "md5",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha1",
+ "tar",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "kisslaunchervis"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "kiss-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "tokio",
+ "windows",
 ]
 
 [[package]]

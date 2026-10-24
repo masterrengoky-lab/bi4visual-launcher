@@ -17,6 +17,27 @@ const API: &str = "https://api.modrinth.com/v2";
 pub enum ProjectType {
     Mod,
     Modpack,
+    Resourcepack,
+}
+
+impl ProjectType {
+    fn as_str(self) -> &'static str {
+        match self {
+            ProjectType::Mod => "mod",
+            ProjectType::Modpack => "modpack",
+            ProjectType::Resourcepack => "resourcepack",
+        }
+    }
+}
+
+/// Sort order of a search: "relevance", "downloads", "updated" or "newest".
+pub fn sort_index(sort: &str) -> &'static str {
+    match sort {
+        "downloads" => "downloads",
+        "updated" => "updated",
+        "newest" => "newest",
+        _ => "relevance",
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,19 +72,20 @@ fn enc(s: &str) -> String {
 }
 
 /// Builds the search URL. Facets are AND-ed groups of OR-ed values.
-pub fn search_url(query: &str, kind: ProjectType, game: Option<&str>, loader: Option<&str>, offset: u32) -> String {
-    let mut facets = vec![format!(r#"["project_type:{}"]"#, if kind == ProjectType::Mod { "mod" } else { "modpack" })];
+pub fn search_url(query: &str, kind: ProjectType, game: Option<&str>, loader: Option<&str>, sort: &str, offset: u32) -> String {
+    let mut facets = vec![format!(r#"["project_type:{}"]"#, kind.as_str())];
     if let Some(g) = game {
         facets.push(format!(r#"["versions:{g}"]"#));
     }
-    if let Some(l) = loader {
+    if let Some(l) = loader.filter(|_| kind != ProjectType::Resourcepack) {
         facets.push(format!(r#"["categories:{l}"]"#));
     }
     let facets = format!("[{}]", facets.join(","));
     format!(
-        "{API}/search?query={}&facets={}&index=relevance&limit=20&offset={offset}",
+        "{API}/search?query={}&facets={}&index={}&limit=20&offset={offset}",
         enc(query),
-        enc(&facets)
+        enc(&facets),
+        sort_index(sort)
     )
 }
 
@@ -73,9 +95,10 @@ pub async fn search(
     kind: ProjectType,
     game: Option<&str>,
     loader: Option<&str>,
+    sort: &str,
     offset: u32,
 ) -> Result<SearchResult> {
-    get_json(client, &search_url(query, kind, game, loader, offset)).await
+    get_json(client, &search_url(query, kind, game, loader, sort, offset)).await
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -179,6 +202,27 @@ pub async fn install_mod(client: &reqwest::Client, paths: &Paths, inst: &mut Ins
     Ok(added)
 }
 
+/// Downloads a resource pack into the instance and turns it on in options.txt.
+/// Returns the pack title.
+pub async fn install_resourcepack(client: &reqwest::Client, paths: &Paths, inst: &Instance, project_id: &str) -> Result<String> {
+    let url = format!(
+        "{API}/project/{project_id}/version?game_versions={}",
+        enc(&format!(r#"["{}"]"#, inst.game_version))
+    );
+    let mut list: Vec<Version> = get_json(client, &url).await?;
+    if list.is_empty() {
+        // Many packs work on newer versions than they list.
+        list = get_json(client, &format!("{API}/project/{project_id}/version")).await?;
+    }
+    let version = list.first().ok_or_else(|| anyhow!("У ресурспака нет файлов"))?;
+    let file = primary(version)?;
+    let dir = inst.game_dir(paths).join("resourcepacks");
+    download::fetch(client, &Job { url: file.url.clone(), dest: dir.join(&file.filename), sha1: file.hashes.get("sha1").cloned() }).await?;
+    crate::resourcepacks::set_enabled(&inst.game_dir(paths), &file.filename, true)?;
+    let project: Project = get_json(client, &format!("{API}/project/{project_id}")).await?;
+    Ok(project.title)
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PackIndex {
@@ -280,11 +324,16 @@ mod tests {
 
     #[test]
     fn builds_search_url() {
-        let u = search_url("sodium mod", ProjectType::Mod, Some("1.21.1"), Some("fabric"), 20);
+        let u = search_url("sodium mod", ProjectType::Mod, Some("1.21.1"), Some("fabric"), "", 20);
         assert!(u.starts_with("https://api.modrinth.com/v2/search?query=sodium%20mod&facets="));
         assert!(u.contains("versions%3A1.21.1"));
         assert!(u.contains("categories%3Afabric"));
+        assert!(u.contains("index=relevance"));
         assert!(u.ends_with("offset=20"));
+        let u = search_url("", ProjectType::Resourcepack, Some("1.21.4"), Some("fabric"), "downloads", 0);
+        assert!(u.contains("project_type%3Aresourcepack"));
+        assert!(!u.contains("categories%3Afabric"));
+        assert!(u.contains("index=downloads"));
     }
 
     #[test]

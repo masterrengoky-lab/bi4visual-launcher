@@ -11,8 +11,8 @@ impl Paths {
         Self { root: root.into() }
     }
 
-    /// `%APPDATA%\bi4visual-launcher`, `~/Library/Application Support/bi4visual-launcher`
-    /// or `~/.local/share/bi4visual-launcher`.
+    /// `%APPDATA%\KissLauncherVis`, `~/Library/Application Support/KissLauncherVis`
+    /// or `~/.local/share/KissLauncherVis`.
     pub fn default_root() -> PathBuf {
         dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("."))

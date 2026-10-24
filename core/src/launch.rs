@@ -111,7 +111,7 @@ pub fn build(
         ("clientid", crate::microsoft::client_id().unwrap_or("0").to_string()),
         ("user_type", user_type.into()),
         ("user_properties", "{}".into()),
-        ("version_type", "bi4visual".into()),
+        ("version_type", "KissLauncherVis".into()),
         ("natives_directory", s(&natives)),
         ("launcher_name", crate::LAUNCHER_NAME.into()),
         ("launcher_version", crate::LAUNCHER_VERSION.into()),

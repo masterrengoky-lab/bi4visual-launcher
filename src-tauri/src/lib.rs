@@ -2,10 +2,10 @@
 
 mod media;
 
-use bi4visual_core::{
+use kiss_core::{
     accounts::{self, AccountStore, AccountView},
-    backgrounds,
-    download, fabric, forge,
+    backgrounds, curseforge,
+    download, fabric, forge, friends, resourcepacks, skin_library,
     instances::{self, Instance, Loader, ModFile},
     java, launch, lyrics,
     manifest::{self, VersionJson},
@@ -184,6 +184,19 @@ fn instance_delete(st: State<AppState>, id: String) -> Res<InstancesResponse> {
 }
 
 #[tauri::command]
+fn instance_rename(st: State<AppState>, id: String, name: String) -> Res<InstancesResponse> {
+    instances::rename(&st.paths, &id, &name).map_err(err)?;
+    Ok(instances_response(&st.paths))
+}
+
+#[tauri::command]
+fn instance_duplicate(st: State<AppState>, id: String) -> Res<InstancesResponse> {
+    let copy = instances::duplicate(&st.paths, &id).map_err(err)?;
+    select(&st.paths, &copy.id)?;
+    Ok(instances_response(&st.paths))
+}
+
+#[tauri::command]
 fn instance_open_dir(app: AppHandle, st: State<AppState>, id: String) -> Res<()> {
     let inst = Instance::load(&st.paths, &id).map_err(err)?;
     open_dir(&app, inst.game_dir(&st.paths))
@@ -243,24 +256,65 @@ fn mod_remove(st: State<AppState>, instance: String, file: String) -> Res<()> {
     instances::remove_mod(&st.paths, &mut inst, &file).map_err(err)
 }
 
+/// Search in Modrinth or CurseForge. `kind`: mod, modpack or resourcepack.
 #[tauri::command]
-async fn modrinth_search(
+async fn catalog_search(
     st: State<'_, AppState>,
+    source: String,
     query: String,
     kind: ProjectType,
     instance: Option<String>,
+    sort: String,
     offset: u32,
 ) -> Res<SearchResult> {
     let inst = instance.and_then(|id| Instance::load(&st.paths, &id).ok());
     let game = inst.as_ref().map(|i| i.game_version.as_str());
+    if source == "curseforge" {
+        let settings = Settings::load(&st.paths);
+        let key = settings.cf_key().ok_or("Для CurseForge нужен API-ключ: вставьте его в Настройках")?;
+        return curseforge::search(&st.client, key, &query, kind == ProjectType::Resourcepack, game, inst.as_ref().map(|i| i.loader), &sort, offset)
+            .await
+            .map_err(err);
+    }
     let loader = inst.as_ref().and_then(|i| i.loader.modrinth());
-    modrinth::search(&st.client, &query, kind, game, loader, offset).await.map_err(err)
+    modrinth::search(&st.client, &query, kind, game, loader, &sort, offset).await.map_err(err)
+}
+
+/// Installs a mod (with dependencies) or a resource pack into an instance.
+/// CurseForge projects have ids starting with `cf:`.
+#[tauri::command]
+async fn catalog_install(st: State<'_, AppState>, kind: ProjectType, instance: String, project: String) -> Res<Vec<String>> {
+    let mut inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    let settings = Settings::load(&st.paths);
+    let cf = project.starts_with(curseforge::PREFIX);
+    let key = || settings.cf_key().ok_or_else(|| "Для CurseForge нужен API-ключ: вставьте его в Настройках".to_string());
+    match (kind, cf) {
+        (ProjectType::Resourcepack, false) => modrinth::install_resourcepack(&st.client, &st.paths, &inst, &project).await.map(|t| vec![t]),
+        (ProjectType::Resourcepack, true) => curseforge::install_resourcepack(&st.client, key()?, &st.paths, &inst, &project).await.map(|t| vec![t]),
+        (_, false) => modrinth::install_mod(&st.client, &st.paths, &mut inst, &project).await,
+        (_, true) => curseforge::install_mod(&st.client, key()?, &st.paths, &mut inst, &project).await,
+    }
+    .map_err(err)
+}
+
+// ---------- resource packs ----------
+
+#[tauri::command]
+fn resourcepacks_list(st: State<AppState>, instance: String) -> Res<Vec<resourcepacks::PackFile>> {
+    let inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    Ok(resourcepacks::list(&inst.game_dir(&st.paths)))
 }
 
 #[tauri::command]
-async fn modrinth_install_mod(st: State<'_, AppState>, instance: String, project: String) -> Res<Vec<String>> {
-    let mut inst = Instance::load(&st.paths, &instance).map_err(err)?;
-    modrinth::install_mod(&st.client, &st.paths, &mut inst, &project).await.map_err(err)
+fn resourcepack_toggle(st: State<AppState>, instance: String, file: String, enabled: bool) -> Res<()> {
+    let inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    resourcepacks::set_enabled(&inst.game_dir(&st.paths), &file, enabled).map_err(err)
+}
+
+#[tauri::command]
+fn resourcepack_remove(st: State<AppState>, instance: String, file: String) -> Res<()> {
+    let inst = Instance::load(&st.paths, &instance).map_err(err)?;
+    resourcepacks::remove(&inst.game_dir(&st.paths), &file).map_err(err)
 }
 
 #[tauri::command]
@@ -346,6 +400,22 @@ async fn account_skin(st: State<'_, AppState>, id: String) -> Res<Option<skins::
 /// Microsoft accounts upload to Mojang; offline accounts keep the skin locally.
 #[tauri::command]
 async fn account_upload_skin(st: State<'_, AppState>, id: String, png: Vec<u8>, slim: bool) -> Res<AccountsResponse> {
+    apply_skin(&st, &id, png, slim).await
+}
+
+#[tauri::command]
+fn account_reset_skin(st: State<AppState>, id: String) -> Res<AccountsResponse> {
+    let mut store = AccountStore::load(&st.paths);
+    if let Some(a) = store.accounts.iter_mut().find(|a| a.id == id) {
+        skins::remove_custom(&st.paths, a);
+        a.custom_skin_slim = None;
+    }
+    store.save(&st.paths).map_err(err)?;
+    Ok(accounts_response(&store))
+}
+
+/// Puts a skin on an account: uploads it for Microsoft, keeps it locally for offline.
+async fn apply_skin(st: &AppState, id: &str, png: Vec<u8>, slim: bool) -> Res<AccountsResponse> {
     let mut store = AccountStore::load(&st.paths);
     let mut acc = store.accounts.iter().find(|a| a.id == id).cloned().ok_or("Аккаунт не найден")?;
     if acc.kind == accounts::AccountKind::Offline {
@@ -369,14 +439,74 @@ async fn account_upload_skin(st: State<'_, AppState>, id: String, png: Vec<u8>, 
 }
 
 #[tauri::command]
-fn account_reset_skin(st: State<AppState>, id: String) -> Res<AccountsResponse> {
-    let mut store = AccountStore::load(&st.paths);
-    if let Some(a) = store.accounts.iter_mut().find(|a| a.id == id) {
-        skins::remove_custom(&st.paths, a);
-        a.custom_skin_slim = None;
+fn skin_library_list(st: State<AppState>) -> Vec<skin_library::EntryView> {
+    skin_library::list(&st.paths)
+}
+
+#[tauri::command]
+fn skin_library_add(st: State<AppState>, name: String, png: Vec<u8>, slim: bool) -> Res<Vec<skin_library::EntryView>> {
+    skin_library::add(&st.paths, &name, &png, slim).map_err(err)?;
+    Ok(skin_library::list(&st.paths))
+}
+
+/// Takes the skin of a licensed nickname into "my skins".
+#[tauri::command]
+async fn skin_library_add_name(st: State<'_, AppState>, name: String) -> Res<Vec<skin_library::EntryView>> {
+    let (exact, png, slim) = skins::skin_of_name(&st.client, name.trim()).await.map_err(err)?;
+    skin_library::add(&st.paths, &exact, &png, slim).map_err(err)?;
+    Ok(skin_library::list(&st.paths))
+}
+
+#[tauri::command]
+fn skin_library_remove(st: State<AppState>, id: String) -> Res<Vec<skin_library::EntryView>> {
+    skin_library::remove(&st.paths, &id).map_err(err)?;
+    Ok(skin_library::list(&st.paths))
+}
+
+#[tauri::command]
+async fn skin_apply_saved(st: State<'_, AppState>, account: String, id: String) -> Res<AccountsResponse> {
+    let (entry, png) = skin_library::get(&st.paths, &id).map_err(err)?;
+    apply_skin(&st, &account, png, entry.slim).await
+}
+
+/// Puts the skin of any licensed nickname on the account.
+#[tauri::command]
+async fn skin_apply_name(st: State<'_, AppState>, account: String, name: String) -> Res<AccountsResponse> {
+    let (_, png, slim) = skins::skin_of_name(&st.client, name.trim()).await.map_err(err)?;
+    apply_skin(&st, &account, png, slim).await
+}
+
+// ---------- friends ----------
+
+#[tauri::command]
+fn friends_list(st: State<AppState>) -> Vec<friends::Friend> {
+    friends::load(&st.paths)
+}
+
+#[tauri::command]
+async fn friend_add(st: State<'_, AppState>, name: String) -> Res<Vec<friends::Friend>> {
+    let name = name.trim().to_string();
+    if !friends::valid_name(&name) {
+        return Err("Ник: 3–16 символов, латиница, цифры и _".into());
     }
-    store.save(&st.paths).map_err(err)?;
-    Ok(accounts_response(&store))
+    // Licensed players get their real spelling and face; offline nicknames are kept as typed.
+    let found = skins::lookup_name(&st.client, &name).await.ok().flatten();
+    let (name, uuid) = match found {
+        Some((uuid, exact)) => (exact, Some(uuid)),
+        None => (name, None),
+    };
+    let mut list = friends::load(&st.paths);
+    friends::add(&mut list, &name, uuid).map_err(err)?;
+    friends::save(&st.paths, &list).map_err(err)?;
+    Ok(list)
+}
+
+#[tauri::command]
+fn friend_remove(st: State<AppState>, name: String) -> Res<Vec<friends::Friend>> {
+    let mut list = friends::load(&st.paths);
+    friends::remove(&mut list, &name);
+    friends::save(&st.paths, &list).map_err(err)?;
+    Ok(list)
 }
 
 // ---------- play ----------
@@ -401,7 +531,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     let log = {
         let app = app.clone();
         move |line: String| {
-            let _ = app.emit("game-log", format!("[bi4visual] {line}"));
+            let _ = app.emit("game-log", format!("[KissLauncherVis] {line}"));
         }
     };
     let result: anyhow::Result<(launch::LaunchPlan, String, bool)> = async {
@@ -413,7 +543,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
             inst.loader_version = None;
             inst.version_id = None;
             inst.save(&st.paths)?;
-            log(format!("Сборка {} переведена на Fabric, чтобы работали визуалы bi4visual", inst.name));
+            log(format!("Сборка {} переведена на Fabric, чтобы работали визуалы KissVis", inst.name));
         }
         let version = instances::ensure_ready(&st.client, &st.paths, &mut inst, &progress).await?;
         let major = VersionJson::load_resolved(&st.paths, &version)?.java_major();
@@ -435,16 +565,16 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
             match modrinth::install_mod(&st.client, &st.paths, &mut inst, FABRIC_API).await {
                 Ok(_) => {
                     inst.save(&st.paths)?;
-                    log("Поставил Fabric API, он нужен моду bi4visual".into());
+                    log("Поставил Fabric API, он нужен моду KissVis".into());
                 }
                 Err(e) => log(format!("Не удалось поставить Fabric API: {e}")),
             }
         }
         if settings.wants_mod() {
             log(if lyrics_mod {
-                format!("Мод bi4visual установлен ({} {})", inst.game_version, "Fabric")
+                format!("Мод KissVis установлен ({} {})", inst.game_version, "Fabric")
             } else {
-                format!("Визуалы bi4visual не будут работать: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
+                format!("Визуалы KissVis не будут работать: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
             });
         }
         Ok((plan, inst.id, lyrics_mod))
@@ -544,9 +674,23 @@ pub fn run() {
             mods_list,
             mod_toggle,
             mod_remove,
-            modrinth_search,
-            modrinth_install_mod,
+            catalog_search,
+            catalog_install,
             modrinth_install_pack,
+            resourcepacks_list,
+            resourcepack_toggle,
+            resourcepack_remove,
+            instance_rename,
+            instance_duplicate,
+            skin_library_list,
+            skin_library_add,
+            skin_library_add_name,
+            skin_library_remove,
+            skin_apply_saved,
+            skin_apply_name,
+            friends_list,
+            friend_add,
+            friend_remove,
             accounts_list,
             account_add_offline,
             account_select,
@@ -559,5 +703,5 @@ pub fn run() {
             play,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running bi4visual launcher");
+        .expect("error while running KissLauncherVis");
 }

@@ -194,6 +194,52 @@ pub fn create(paths: &Paths, name: &str, game_version: &str, loader: Loader, loa
     Ok(inst)
 }
 
+pub fn rename(paths: &Paths, id: &str, name: &str) -> Result<Instance> {
+    let name = name.trim();
+    if name.is_empty() {
+        bail!("Введите название сборки");
+    }
+    let mut inst = Instance::load(paths, id)?;
+    inst.name = name.to_string();
+    inst.save(paths)?;
+    Ok(inst)
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> Result<()> {
+    std::fs::create_dir_all(to)?;
+    for e in std::fs::read_dir(from)?.flatten() {
+        let dest = to.join(e.file_name());
+        if e.file_type()?.is_dir() {
+            copy_dir(&e.path(), &dest)?;
+        } else {
+            std::fs::copy(e.path(), dest)?;
+        }
+    }
+    Ok(())
+}
+
+/// A copy of an instance with its mods, configs, resource packs and options,
+/// but without worlds.
+pub fn duplicate(paths: &Paths, id: &str) -> Result<Instance> {
+    let src = Instance::load(paths, id)?;
+    let mut copy = create(paths, &format!("{} (копия)", src.name), &src.game_version, src.loader, src.loader_version.clone())?;
+    copy.mods = src.mods.clone();
+    copy.icon_url = src.icon_url.clone();
+    copy.save(paths)?;
+    let (from, to) = (src.game_dir(paths), copy.game_dir(paths));
+    for sub in ["mods", "config", "resourcepacks", "shaderpacks"] {
+        if from.join(sub).is_dir() {
+            copy_dir(&from.join(sub), &to.join(sub))?;
+        }
+    }
+    for f in ["options.txt", "servers.dat"] {
+        if from.join(f).is_file() {
+            std::fs::copy(from.join(f), to.join(f))?;
+        }
+    }
+    Ok(copy)
+}
+
 pub fn delete(paths: &Paths, id: &str) -> Result<()> {
     let d = dir(paths, id);
     if id.is_empty() || id.contains(['/', '\\']) || id.contains("..") || !d.starts_with(root(paths)) {

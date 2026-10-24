@@ -1,7 +1,7 @@
 //! Watches the music playing in the system while the game runs and keeps
 //! `bi4visual/nowplaying.json` in the game folder up to date for the mod.
 
-use bi4visual_core::lyrics::{self, NowPlaying};
+use kiss_core::lyrics::{self, NowPlaying};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

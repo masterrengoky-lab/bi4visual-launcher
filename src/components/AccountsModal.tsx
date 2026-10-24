@@ -3,10 +3,12 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, errorText, type Accounts, type DeviceCode } from "../lib/api";
 import Modal from "./Modal";
 import Avatar from "./Avatar";
+import { useT } from "../lib/i18n";
 
 type Props = { accounts: Accounts; onChange: (a: Accounts) => void; onClose: () => void };
 
 export default function AccountsModal({ accounts, onChange, onClose }: Props) {
+  const { t } = useT();
   const [nick, setNick] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState<DeviceCode | null>(null);
@@ -43,7 +45,7 @@ export default function AccountsModal({ accounts, onChange, onClose }: Props) {
   }
 
   return (
-    <Modal title="Аккаунты" onClose={onClose}>
+    <Modal title={t("acc.title")} onClose={onClose}>
       <ul className="account-list">
         {accounts.accounts.map((a) => (
           <li key={a.id} className={a.id === accounts.selected ? "selected" : ""}>
@@ -51,35 +53,35 @@ export default function AccountsModal({ accounts, onChange, onClose }: Props) {
               <Avatar uuid={a.uuid} name={a.name} />
               <span>
                 <b>{a.name}</b>
-                <small>{a.kind === "microsoft" ? "Microsoft" : "Без пароля"}</small>
+                <small>{a.kind === "microsoft" ? t("acc.microsoft") : t("acc.offline")}</small>
               </span>
             </button>
-            <button className="icon-btn small" title="Удалить" onClick={() => run(api.removeAccount(a.id))}>✕</button>
+            <button className="icon-btn small" title={t("common.remove")} onClick={() => run(api.removeAccount(a.id))}>×</button>
           </li>
         ))}
-        {accounts.accounts.length === 0 && <li className="muted">Аккаунтов пока нет</li>}
+        {accounts.accounts.length === 0 && <li className="muted">{t("acc.none")}</li>}
       </ul>
 
       <form className="row" onSubmit={addOffline}>
         <input
           className="input grow"
-          placeholder="Ник для игры без пароля"
+          placeholder={t("acc.nick")}
           value={nick}
           maxLength={16}
           onChange={(e) => setNick(e.target.value)}
         />
-        <button className="btn primary" disabled={nick.trim().length < 3}>Добавить</button>
+        <button className="btn primary" disabled={nick.trim().length < 3}>{t("common.add")}</button>
       </form>
 
       {accounts.microsoft_available && (
         code ? (
           <div className="ms-code">
-            Откройте <b>{code.verification_uri}</b> и введите код
+            {t("acc.msOpen", { url: code.verification_uri })}
             <div className="code">{code.user_code}</div>
-            <small className="muted">Код уже скопирован. Ждём подтверждения…</small>
+            <small className="muted">{t("acc.msWait")}</small>
           </div>
         ) : (
-          <button className="btn ms" onClick={microsoft}>Войти через Microsoft</button>
+          <button className="btn ms" onClick={microsoft}>{t("acc.ms")}</button>
         )
       )}
       {error && <p className="error-text">{error}</p>}

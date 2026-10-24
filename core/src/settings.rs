@@ -35,6 +35,10 @@ pub struct Settings {
     pub sky: String,
     /// Keep the game at night on the player's side.
     pub always_night: bool,
+    /// Launcher language: "ru", "en" or "uk".
+    pub language: String,
+    /// Personal CurseForge API key; without it only Modrinth is searched.
+    pub curseforge_key: Option<String>,
 }
 
 impl Default for Settings {
@@ -57,12 +61,14 @@ impl Default for Settings {
             lyrics: true,
             sky: "galaxy".into(),
             always_night: true,
+            language: "ru".into(),
+            curseforge_key: None,
         }
     }
 }
 
 impl Settings {
-    /// Whether anything needs the bi4visual mod in the game.
+    /// Whether anything needs the KissVis mod in the game.
     pub fn wants_mod(&self) -> bool {
         self.lyrics || self.sky != "off" || self.always_night
     }
@@ -78,5 +84,12 @@ impl Settings {
         crate::paths::ensure_parent(&paths.settings_file())?;
         std::fs::write(paths.settings_file(), serde_json::to_vec_pretty(self)?)?;
         Ok(())
+    }
+}
+
+impl Settings {
+    /// The CurseForge key, if one is set.
+    pub fn cf_key(&self) -> Option<&str> {
+        self.curseforge_key.as_deref().map(str::trim).filter(|k| !k.is_empty())
     }
 }
