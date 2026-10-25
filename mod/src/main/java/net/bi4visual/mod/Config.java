@@ -17,6 +17,8 @@ public final class Config {
         public String time = "off";
         public String weather = "off";
         public boolean shulkerView = true;
+        /** BetterMinecraft: inventories open with a short zoom and fade, third person camera slides out. */
+        public boolean better = true;
         /** Song lyrics floating in the world. */
         public boolean lyrics = true;
         /** The bi4visual HUD panels, all together and one by one. */
@@ -36,10 +38,14 @@ public final class Config {
         public boolean jumpCircles = true;
         /** See-through first-person arm with a soft glow in the theme colour. */
         public boolean handGlow = false;
+        /** HandShader: the held item shimmers (enchant glint) and the arm glows, first person only. */
+        public boolean handShader = false;
         /** HMI: item in hand sways behind the view and breathes: off, soft or strong. */
         public String hmi = "off";
         /** Own player only: size of the model, an outline in the theme colour, and things drawn around it. */
         public String model = "normal";
+        /** Custom model: our own accessories on the player (off, demon, rabbit, cat, angel). */
+        public String model3d = "off";
         public boolean outline = false;
         public boolean halo = false;
         public boolean aura = false;
@@ -144,6 +150,9 @@ public final class Config {
             if (d != null) save(d);
         }
     }
+
+    /** True while the first-person item is drawn, so HandShader can make it shimmer. */
+    public static volatile boolean drawingHand;
 
     /** The day time Ambience holds the client at, or -1 to leave it alone. */
     public static long ambienceTime() {

@@ -37,6 +37,7 @@ public class ItemHandMixin {
                                 float swing, ItemStack stack, float equipped, PoseStack pose,
                                 MultiBufferSource buffers, int light, CallbackInfo ci) {
         pose.pushPose();
+        Config.drawingHand = Config.get().handShader;
         String mode = Config.get().hmi;
         if (mode.equals("off")) return;
         float power = mode.equals("strong") ? 2f : 1f;
@@ -84,6 +85,7 @@ public class ItemHandMixin {
     private void bi4visual$swayEnd(AbstractClientPlayer player, float partial, float pitch, InteractionHand hand,
                                    float swing, ItemStack stack, float equipped, PoseStack pose,
                                    MultiBufferSource buffers, int light, CallbackInfo ci) {
+        Config.drawingHand = false;
         pose.popPose();
     }
 }

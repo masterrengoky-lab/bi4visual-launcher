@@ -422,7 +422,7 @@ public class ModulesScreen extends Screen {
 
         // Sidebar: title, groups and the profile card at the bottom.
         g.drawString(font, Fonts.hud("bi4visual"), px + 10, py + 10, TEXT, false);
-        g.drawString(font, Fonts.small("1.2"), px + 12 + font.width(Fonts.hud("bi4visual")), py + 11, accent, false);
+        g.drawString(font, Fonts.small("1.3"), px + 12 + font.width(Fonts.hud("bi4visual")), py + 11, accent, false);
         int y = py + 30;
         String[] groups = {"Visual", null, "Other", "Client", null, null, null};
         for (int i = 0; i < groups.length; i++) {

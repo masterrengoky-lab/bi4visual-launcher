@@ -20,7 +20,7 @@ public class HandMixin {
     @Redirect(method = "renderHand", require = 0, at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/model/geom/ModelPart;render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;II)V"))
     private void bi4visual$glow(ModelPart arm, PoseStack pose, VertexConsumer buffer, int light, int overlay) {
-        if (!Config.get().handGlow) {
+        if (!Config.get().handGlow && !Config.get().handShader) {
             arm.render(pose, buffer, light, overlay);
             return;
         }

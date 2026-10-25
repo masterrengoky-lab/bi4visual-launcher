@@ -122,11 +122,12 @@ public final class World3D {
     private static boolean cosmetics(Lyrics3D.Sink sink, PoseStack pose, Quaternionf camera, Minecraft mc, Player player,
                                      Vec3 eye, long now, int accent) {
         Config.Data d = Config.get();
-        if (!d.halo && !d.aura && !d.orbit) return false;
         float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
         Vec3 feet = player.getPosition(partial);
         float k = Modules.modelScale();
         double x = feet.x - eye.x, y = feet.y - eye.y, z = feet.z - eye.z;
+        boolean model = Models.render(sink, pose, mc, player, x, y, z, partial, now);
+        if (!d.halo && !d.aura && !d.orbit) return model;
         float t = (now % 100_000L) / 1000f;
         if (d.halo) {
             float bob = Mth.sin(t * 2.2f) * 0.03f;

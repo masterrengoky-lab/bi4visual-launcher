@@ -19,7 +19,10 @@
     "ItemHandMixin",
     "PlayerModelMixin",
     "WeatherMixin",
-    "ShulkerMixin"
+    "ShulkerMixin",
+    "BetterMixin",
+    "CameraMixin",
+    "FoilMixin"
   ],
   "injectors": {
     "defaultRequire": 1
