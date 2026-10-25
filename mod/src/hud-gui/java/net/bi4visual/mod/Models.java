@@ -143,7 +143,7 @@ final class Models {
     // ---------- drawing ----------
 
     /** A box centred at (cx, cy, cz) in model pixels, flat shaded per face. */
-    private static void cube(Lyrics3D.Sink sink, PoseStack pose, float cx, float cy, float cz, float sx, float sy, float sz, int argb) {
+    static void cube(Lyrics3D.Sink sink, PoseStack pose, float cx, float cy, float cz, float sx, float sy, float sz, int argb) {
         face(sink, pose, cx, cy + sy / 2, cz, sx, sz, new Quaternionf().rotationX(-Mth.HALF_PI), shade(argb, 1f));
         face(sink, pose, cx, cy - sy / 2, cz, sx, sz, new Quaternionf().rotationX(Mth.HALF_PI), shade(argb, 0.55f));
         face(sink, pose, cx, cy, cz + sz / 2, sx, sy, new Quaternionf(), shade(argb, 0.85f));

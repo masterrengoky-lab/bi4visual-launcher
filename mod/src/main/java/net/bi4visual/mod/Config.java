@@ -47,6 +47,12 @@ public final class Config {
         /** SwingAnimation: how fast the own arm swings (off = vanilla, slow, slower). */
         public String swing = "off";
         public boolean chinaHat = false;
+        /** ItemPhysic: dropped items lie flat and still. BlockOverlay: the aimed block is filled with the theme colour. */
+        public boolean itemPhysic = false;
+        public boolean blockOverlay = false;
+        /** NoRender: no camera shake when hurt. AspectRatio: stretch the picture like a 4:3 screen. */
+        public boolean noHurtShake = false;
+        public String aspect = "off";
         /** Own player only: size of the model, an outline in the theme colour, and things drawn around it. */
         public String model = "normal";
         /** Custom model: our own accessories on the player (off, demon, rabbit, cat, angel). */

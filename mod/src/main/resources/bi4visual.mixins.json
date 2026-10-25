@@ -23,7 +23,9 @@
     "BetterMixin",
     "CameraMixin",
     "FoilMixin",
-    "SwingMixin"
+    "SwingMixin",
+    "ViewMixin",
+    "ItemPhysicMixin"
   ],
   "injectors": {
     "defaultRequire": 1

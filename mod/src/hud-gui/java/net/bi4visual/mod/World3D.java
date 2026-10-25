@@ -97,6 +97,26 @@ public final class World3D {
             }
         }
 
+        if (Config.get().blockOverlay && mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit
+                && hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            var pos = hit.getBlockPos();
+            var shape = mc.level.getBlockState(pos).getShape(mc.level, pos);
+            if (!shape.isEmpty()) {
+                var box = shape.bounds();
+                double grow = 0.004;
+                float sx = (float) (box.maxX - box.minX + grow * 2), sy = (float) (box.maxY - box.minY + grow * 2),
+                        sz = (float) (box.maxZ - box.minZ + grow * 2);
+                double cx = pos.getX() + (box.minX + box.maxX) / 2 - eye.x;
+                double cy = pos.getY() + (box.minY + box.maxY) / 2 - eye.y;
+                double cz = pos.getZ() + (box.minZ + box.maxZ) / 2 - eye.z;
+                pose.pushPose();
+                pose.translate((float) cx, (float) cy, (float) cz);
+                Models.cube(sink, pose, 0, 0, 0, sx, sy, sz, 0x48000000 | accent);
+                pose.popPose();
+                drawn = true;
+            }
+        }
+
         String dim = mc.level.dimension().toString();
         for (Config.Waypoint w : Config.get().waypoints) {
             if (!dim.equals(w.dim)) continue;
