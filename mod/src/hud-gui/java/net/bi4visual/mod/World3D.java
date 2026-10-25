@@ -117,6 +117,8 @@ public final class World3D {
             }
         }
 
+        drawn |= Hits.render(sink, pose, camera, eye, now, accent);
+
         String dim = mc.level.dimension().toString();
         for (Config.Waypoint w : Config.get().waypoints) {
             if (!dim.equals(w.dim)) continue;
@@ -183,7 +185,7 @@ public final class World3D {
     }
 
     /** A ring glyph lying flat on the ground, centred at the point. */
-    private static void flat(Lyrics3D.Sink sink, PoseStack pose, double x, double y, double z, float radius, int argb) {
+    static void flat(Lyrics3D.Sink sink, PoseStack pose, double x, double y, double z, float radius, int argb) {
         float size = radius * 2f / 64f;
         pose.pushPose();
         pose.translate((float) x, (float) y, (float) z);
@@ -194,7 +196,7 @@ public final class World3D {
     }
 
     /** Text facing the camera at the point, drawn from (x0, y0) in font pixels. */
-    private static void billboard(Lyrics3D.Sink sink, PoseStack pose, Quaternionf camera, double x, double y, double z,
+    static void billboard(Lyrics3D.Sink sink, PoseStack pose, Quaternionf camera, double x, double y, double z,
                                   Component text, float scale, int argb, float x0, float y0) {
         pose.pushPose();
         pose.translate((float) x, (float) y, (float) z);

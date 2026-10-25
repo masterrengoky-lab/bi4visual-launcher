@@ -53,6 +53,18 @@ public final class Config {
         /** NoRender: no camera shake when hurt. AspectRatio: stretch the picture like a 4:3 screen. */
         public boolean noHurtShake = false;
         public String aspect = "off";
+        /** CustomFog: off, theme, pink, sky or dark. */
+        public String fog = "off";
+        /** Effects of the own hits. */
+        public boolean hitCircle = false;
+        public boolean hitWave = false;
+        public boolean damageNumbers = false;
+        public boolean deathEffect = false;
+        /** FreeLook (hold its bind, Left Alt by default), NameProtect, food saturation on the hunger bar, own scoreboard. */
+        public boolean freeLook = true;
+        public boolean nameProtect = false;
+        public boolean saturation = true;
+        public boolean scoreboard = false;
         /** Own player only: size of the model, an outline in the theme colour, and things drawn around it. */
         public String model = "normal";
         /** Custom model: our own accessories on the player (off, demon, rabbit, cat, angel). */
@@ -86,7 +98,7 @@ public final class Config {
         /** Colour theme for the menus and the HUD (see Themes). */
         public String theme = "violet";
         /** Module id to GLFW key code. Zoom is held, the rest toggle. */
-        public java.util.Map<String, Integer> binds = new java.util.HashMap<>(java.util.Map.of("zoom", 67));
+        public java.util.Map<String, Integer> binds = new java.util.HashMap<>(java.util.Map.of("zoom", 67, "freeLook", 342));
         public java.util.List<Waypoint> waypoints = new java.util.ArrayList<>();
         /** Main menu background tint (see MenuScreen.BACKGROUNDS) and how dark it is, 0–100. */
         public String menuBg = "forest";

@@ -61,6 +61,7 @@ public final class Hud {
         if (c.inventory) inventory(g, player, h);
         if (c.media) media(g, font, w, h, accent);
         if (c.toasts) toasts(g, font, w, h, accent);
+        if (c.saturation) saturation(g, mc, player, w, h);
         int ry = 30;
         if (c.stats) ry = stats(g, font, mc, player, w, ry, accent) + 6;
         if (c.resources) resources(g, font, player, w, ry, accent);
@@ -129,6 +130,61 @@ public final class Hud {
             String n = String.valueOf(counts[k]);
             text(g, font, n, ix + 9 - width(font, n) / 2, y + 20, counts[k] > 0 ? TEXT : MUTED);
             ix += 22;
+        }
+    }
+
+    // ---------- FoodSaturation ----------
+
+    /** Gold edges over the hunger icons, as many as the saturation fills. */
+    private static void saturation(GuiGraphics g, Minecraft mc, Player player, int w, int h) {
+        if (mc.gameMode == null || !mc.gameMode.canHurtPlayer() || player.isCreative() || player.isSpectator()) return;
+        if (player.getVehicle() instanceof net.minecraft.world.entity.LivingEntity) return;
+        float sat = player.getFoodData().getSaturationLevel();
+        if (sat <= 0) return;
+        int right = w / 2 + 91;
+        int y = h - 39;
+        for (int i = 0; i < 10; i++) {
+            float part = Math.min(1f, Math.max(0f, (sat - i * 2) / 2f));
+            if (part <= 0) break;
+            int x = right - i * 8 - 9;
+            int c = 0xFFFFD34D;
+            g.fill(x, y + 8, x + Math.round(9 * part), y + 9, c);
+            g.fill(x, y, x + Math.round(9 * part), y + 1, withAlpha(c, 0x90));
+        }
+    }
+
+    // ---------- CustomScoreboard ----------
+
+    public static void scoreboard(GuiGraphics g, net.minecraft.world.scores.Objective objective) {
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc.font;
+        var board = objective.getScoreboard();
+        var format = objective.numberFormatOrDefault(net.minecraft.network.chat.numbers.StyledFormat.SIDEBAR_DEFAULT);
+        List<net.minecraft.network.chat.Component[]> rows = new ArrayList<>();
+        var entries = new ArrayList<>(board.listPlayerScores(objective));
+        entries.removeIf(e -> e.isHidden());
+        entries.sort((a, b) -> b.value() != a.value() ? Integer.compare(b.value(), a.value()) : a.owner().compareToIgnoreCase(b.owner()));
+        for (var e : entries) {
+            if (rows.size() >= 15) break;
+            var team = board.getPlayersTeam(e.owner());
+            var name = net.minecraft.world.scores.PlayerTeam.formatNameForTeam(team, e.ownerName());
+            rows.add(new net.minecraft.network.chat.Component[] {name, e.formatValue(format)});
+        }
+        var title = objective.getDisplayName();
+        int pw = font.width(title) + 16;
+        for (var r : rows) pw = Math.max(pw, font.width(r[0]) + font.width(r[1]) + 18);
+        int ph = 18 + rows.size() * 10 + 4;
+        int x = g.guiWidth() - pw - 6;
+        int y = g.guiHeight() / 2 - ph / 2;
+        panel(g, x, y, pw, ph);
+        int accent = Config.accent();
+        g.drawString(font, title, x + (pw - font.width(title)) / 2, y + 5, TEXT, false);
+        g.fill(x + PAD, y + 15, x + pw - PAD, y + 16, withAlpha(accent, 0x90));
+        for (int i = 0; i < rows.size(); i++) {
+            int ry = y + 19 + i * 10;
+            g.drawString(font, rows.get(i)[0], x + PAD, ry, TEXT, false);
+            var v = rows.get(i)[1];
+            g.drawString(font, v, x + pw - PAD - font.width(v), ry, 0xFFFF6B7A, false);
         }
     }
 

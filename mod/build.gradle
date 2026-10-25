@@ -23,6 +23,7 @@ sourceSets.main.java.srcDir(atLeast([1, 21, 11]) ? 'src/font-desc-id/java'
 // 1.21.9: the sky pass stops passing a buffer source we can draw the galaxy into.
 sourceSets.main.java.srcDir(atLeast([1, 21, 9]) ? 'src/sky-none/java' : 'src/sky-buffers/java')
 sourceSets.main.java.srcDir(atLeast([1, 21, 9]) ? 'src/hand-none/java' : 'src/hand-buffers/java')
+sourceSets.main.java.srcDir(atLeast([1, 21, 6]) ? 'src/fog-none/java' : 'src/fog-params/java')
 // HUD and main menu draw with GuiGraphics, which 26.x replaced; 1.21.11 moved button drawing to renderContents.
 if (atLeast([26, 0, 0])) {
     sourceSets.main.java.srcDir('src/hud-none/java')

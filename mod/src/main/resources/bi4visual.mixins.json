@@ -25,7 +25,12 @@
     "FoilMixin",
     "SwingMixin",
     "ViewMixin",
-    "ItemPhysicMixin"
+    "ItemPhysicMixin",
+    "FogMixin",
+    "FreeLookMixin",
+    "FreeCameraMixin",
+    "NameProtectMixin",
+    "ScoreboardMixin"
   ],
   "injectors": {
     "defaultRequire": 1

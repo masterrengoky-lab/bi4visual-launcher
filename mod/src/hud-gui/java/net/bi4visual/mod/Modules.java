@@ -82,6 +82,7 @@ public final class Modules {
             onOff("better", "BetterMinecraft", "Плавное открытие инвентаря и выезд камеры в F5", Category.RENDER, d -> d.better, (d, v) -> d.better = v),
             onOff("fullbright", "FullBright", "Светло даже ночью и в пещерах", Category.RENDER, d -> d.fullbright, (d, v) -> d.fullbright = v),
             onOff("zoom", "Zoom", "Приближение, пока держишь клавишу бинда", Category.RENDER, d -> d.zoom, (d, v) -> d.zoom = v),
+            onOff("freeLook", "FreeLook", "Осмотреться вокруг, пока держишь бинд (Left Alt)", Category.RENDER, d -> d.freeLook, (d, v) -> d.freeLook = v),
             cycle("crosshair", "Crosshair", "Свой прицел вместо обычного", Category.RENDER, d -> d.crosshair, (d, v) -> d.crosshair = v,
                     new String[] {"off", "dot", "plus", "circle"}, new String[] {"выкл", "Точка", "Плюс", "Круг"}),
             onOff("handGlow", "HandGlow", "Прозрачная светящаяся рука (1.21.4–1.21.8)", Category.RENDER, d -> d.handGlow, (d, v) -> d.handGlow = v),
@@ -97,6 +98,12 @@ public final class Modules {
             onOff("noHurtShake", "NoRender", "Экран не трясётся, когда тебя бьют", Category.RENDER, d -> d.noHurtShake, (d, v) -> d.noHurtShake = v),
             cycle("aspect", "AspectRatio", "Растянуть картинку, как на квадратном мониторе", Category.RENDER, d -> d.aspect, (d, v) -> d.aspect = v,
                     new String[] {"off", "4:3", "5:4", "16:10"}, new String[] {"выкл", "4:3", "5:4", "16:10"}),
+            cycle("fog", "CustomFog", "Цветной туман поближе (1.21.4–1.21.5)", Category.RENDER, d -> d.fog, (d, v) -> d.fog = v,
+                    new String[] {"off", "theme", "pink", "sky", "dark"}, new String[] {"выкл", "Цвет темы", "Розовый", "Голубой", "Тёмный"}),
+            onOff("hitCircle", "HitCircle", "Круг под тем, кого ты ударил", Category.RENDER, d -> d.hitCircle, (d, v) -> d.hitCircle = v),
+            onOff("hitWave", "HitWave", "Волна вокруг цели при ударе", Category.RENDER, d -> d.hitWave, (d, v) -> d.hitWave = v),
+            onOff("damageNumbers", "DamageParticles", "Сколько урона ты нанёс, цифрами над целью", Category.RENDER, d -> d.damageNumbers, (d, v) -> d.damageNumbers = v),
+            onOff("deathEffect", "DeathEffect", "Вспышка, когда твоя цель умирает", Category.RENDER, d -> d.deathEffect, (d, v) -> d.deathEffect = v),
             onOff("jumpCircles", "JumpCircle", "Круги на земле, где ты прыгнул", Category.RENDER, d -> d.jumpCircles, (d, v) -> d.jumpCircles = v),
             onOff("trails", "Trails", "Светящийся след за тобой", Category.RENDER, d -> d.trails, (d, v) -> d.trails = v),
             cycle("atmosphere", "Atmosphere", "Падающий снег вокруг тебя", Category.RENDER, d -> d.atmosphere, (d, v) -> d.atmosphere = v,
@@ -128,10 +135,13 @@ public final class Modules {
             onOff("hotbar", "Hotbar", "Стеклянный хотбар вместо обычного", Category.INTERFACE, d -> d.hotbar, (d, v) -> d.hotbar = v),
             onOff("keybinds", "KeyBinds", "Список модулей с биндами", Category.INTERFACE, d -> d.keybinds, (d, v) -> d.keybinds = v),
             onOff("media", "MediaPlayer", "Карточка играющего трека", Category.INTERFACE, d -> d.media, (d, v) -> d.media = v),
+            onOff("saturation", "FoodSaturation", "Насыщение золотом поверх полоски голода", Category.INTERFACE, d -> d.saturation, (d, v) -> d.saturation = v),
+            onOff("scoreboard", "Scoreboard", "Таблица справа в стиле bi4visual", Category.INTERFACE, d -> d.scoreboard, (d, v) -> d.scoreboard = v),
             onOff("toasts", "Notifications", "Сообщения о включении модулей", Category.INTERFACE, d -> d.toasts, (d, v) -> d.toasts = v),
             onOff("menu", "MainMenu", "Своё главное меню вместо обычного", Category.INTERFACE, d -> d.menu, (d, v) -> d.menu = v),
             // Utility
             onOff("commandFix", "CommandFix", "Команда в русской раскладке: .рщьу → /home", Category.UTILITY, d -> d.commandFix, (d, v) -> d.commandFix = v),
+            onOff("nameProtect", "NameProtect", "Твой ник на экране заменяется на «bi4visual»", Category.UTILITY, d -> d.nameProtect, (d, v) -> d.nameProtect = v),
             onOff("hitSound", "HitSound", "Звук, когда ты бьёшь", Category.UTILITY, d -> d.hitSound, (d, v) -> d.hitSound = v));
 
     private Modules() {}
@@ -194,7 +204,7 @@ public final class Modules {
 
         if (mc.screen == null && !ModulesScreen.capturing()) {
             for (var e : d.binds.entrySet()) {
-                if (e.getKey().equals("zoom")) continue;
+                if (e.getKey().equals("zoom") || e.getKey().equals("freeLook")) continue;
                 if (Keys.pressed(e.getValue())) {
                     Module m = byId(e.getKey());
                     if (m != null) click(m);
@@ -202,6 +212,8 @@ public final class Modules {
             }
         }
 
+        Hits.tick();
+        FreeLook.frame(mc, d);
         boolean onGround = player.onGround();
         if (wasOnGround && !onGround && player.getDeltaMovement().y > 0.2) {
             World3D.jumped(player.getX(), player.getY(), player.getZ());
