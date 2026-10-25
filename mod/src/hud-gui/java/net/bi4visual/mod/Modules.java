@@ -88,6 +88,10 @@ public final class Modules {
             cycle("hmi", "HMI", "Hold My Items: предмет в руке плавно качается (1.21.4–1.21.8)", Category.RENDER, d -> d.hmi, (d, v) -> d.hmi = v,
                     new String[] {"off", "soft", "strong"}, new String[] {"выкл", "Мягко", "Сильно"}),
             onOff("handShader", "HandShader", "Переливающийся предмет и светящаяся рука (1.21.4–1.21.8)", Category.RENDER, d -> d.handShader, (d, v) -> d.handShader = v),
+            cycle("viewModel", "ViewModel", "Где предметы в руках от первого лица (1.21.4–1.21.8)", Category.RENDER, d -> d.viewModel, (d, v) -> d.viewModel = v,
+                    new String[] {"off", "low", "close", "far", "centre"}, new String[] {"выкл", "Ниже", "Ближе", "Дальше", "К центру"}),
+            cycle("swing", "SwingAnimation", "Медленный плавный взмах рукой, только у тебя", Category.RENDER, d -> d.swing, (d, v) -> d.swing = v,
+                    new String[] {"off", "slow", "slower"}, new String[] {"выкл", "Медленно", "Очень медленно"}),
             onOff("jumpCircles", "JumpCircle", "Круги на земле, где ты прыгнул", Category.RENDER, d -> d.jumpCircles, (d, v) -> d.jumpCircles = v),
             onOff("trails", "Trails", "Светящийся след за тобой", Category.RENDER, d -> d.trails, (d, v) -> d.trails = v),
             cycle("atmosphere", "Atmosphere", "Падающий снег вокруг тебя", Category.RENDER, d -> d.atmosphere, (d, v) -> d.atmosphere = v,
@@ -102,6 +106,7 @@ public final class Modules {
                     new String[] {"100", "85", "70", "55", "40"}, new String[] {"100%", "85%", "70%", "55%", "40%"}),
             onOff("outline", "Контур", "Светящийся контур твоего персонажа цветом темы", Category.MODEL, d -> d.outline, (d, v) -> d.outline = v),
             // Cosmetics: things around the player, third person
+            onOff("chinaHat", "ChinaHat", "Светящаяся конусная шляпа на голове", Category.WORLD, d -> d.chinaHat, (d, v) -> d.chinaHat = v),
             onOff("halo", "Нимб", "Светящееся кольцо над головой", Category.WORLD, d -> d.halo, (d, v) -> d.halo = v),
             onOff("aura", "Аура", "Пульсирующий круг под ногами", Category.WORLD, d -> d.aura, (d, v) -> d.aura = v),
             onOff("orbit", "Орбита", "Огоньки летают вокруг тебя", Category.WORLD, d -> d.orbit, (d, v) -> d.orbit = v),

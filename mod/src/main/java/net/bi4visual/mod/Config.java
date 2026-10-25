@@ -42,6 +42,11 @@ public final class Config {
         public boolean handShader = false;
         /** HMI: item in hand sways behind the view and breathes: off, soft or strong. */
         public String hmi = "off";
+        /** ViewModel: where the first-person items sit (off, low, close, far, centre). */
+        public String viewModel = "off";
+        /** SwingAnimation: how fast the own arm swings (off = vanilla, slow, slower). */
+        public String swing = "off";
+        public boolean chinaHat = false;
         /** Own player only: size of the model, an outline in the theme colour, and things drawn around it. */
         public String model = "normal";
         /** Custom model: our own accessories on the player (off, demon, rabbit, cat, angel). */

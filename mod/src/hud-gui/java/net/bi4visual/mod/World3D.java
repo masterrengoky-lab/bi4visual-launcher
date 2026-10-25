@@ -127,7 +127,17 @@ public final class World3D {
         float k = Modules.modelScale();
         double x = feet.x - eye.x, y = feet.y - eye.y, z = feet.z - eye.z;
         boolean model = Models.render(sink, pose, mc, player, x, y, z, partial, now);
-        if (!d.halo && !d.aura && !d.orbit) return model;
+        if (!d.halo && !d.aura && !d.orbit && !d.chinaHat) return model;
+        if (d.chinaHat) {
+            // A cone of rings, wide at the brim and closing at the tip.
+            double top = (player.isCrouching() ? 1.55 : 1.9) * k + 0.04;
+            for (int i = 0; i < 14; i++) {
+                float f = i / 13f;
+                float radius = (0.62f - f * 0.58f) * k;
+                int a = (int) (200 - f * 90);
+                flat(sink, pose, x, y + top + f * 0.32 * k, z, radius, (a << 24) | accent);
+            }
+        }
         float t = (now % 100_000L) / 1000f;
         if (d.halo) {
             float bob = Mth.sin(t * 2.2f) * 0.03f;

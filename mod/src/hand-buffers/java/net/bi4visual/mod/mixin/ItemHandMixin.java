@@ -38,6 +38,17 @@ public class ItemHandMixin {
                                 MultiBufferSource buffers, int light, CallbackInfo ci) {
         pose.pushPose();
         Config.drawingHand = Config.get().handShader;
+        float vx = 0, vy = 0, vz = 0;
+        switch (Config.get().viewModel) {
+            case "low" -> vy = -0.12f;
+            case "close" -> vz = 0.12f;
+            case "far" -> vz = -0.15f;
+            case "centre" -> vx = -0.12f;
+            default -> {
+            }
+        }
+        float mirror = (hand == InteractionHand.MAIN_HAND) == (player.getMainArm() == net.minecraft.world.entity.HumanoidArm.RIGHT) ? 1 : -1;
+        if (vx != 0 || vy != 0 || vz != 0) pose.translate(vx * mirror, vy, vz);
         String mode = Config.get().hmi;
         if (mode.equals("off")) return;
         float power = mode.equals("strong") ? 2f : 1f;

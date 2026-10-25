@@ -22,7 +22,8 @@
     "ShulkerMixin",
     "BetterMixin",
     "CameraMixin",
-    "FoilMixin"
+    "FoilMixin",
+    "SwingMixin"
   ],
   "injectors": {
     "defaultRequire": 1
