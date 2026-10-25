@@ -61,6 +61,163 @@ public final class Hud {
         if (c.inventory) inventory(g, player, h);
         if (c.media) media(g, font, w, h, accent);
         if (c.toasts) toasts(g, font, w, h, accent);
+        int ry = 30;
+        if (c.stats) ry = stats(g, font, mc, player, w, ry, accent) + 6;
+        if (c.resources) resources(g, font, player, w, ry, accent);
+    }
+
+    // ---------- Stats: FPS, BPS, TPS, ping ----------
+
+    private static long tpsAt;
+    private static long tpsTicks = -1;
+    private static float tps = 20f;
+    private static float bps;
+
+    private static int stats(GuiGraphics g, Font font, Minecraft mc, Player player, int w, int y, int accent) {
+        long now = System.currentTimeMillis();
+        long ticks = mc.level.getGameTime();
+        if (tpsTicks < 0 || ticks < tpsTicks) {
+            tpsTicks = ticks;
+            tpsAt = now;
+        } else if (now - tpsAt >= 1000) {
+            float measured = (ticks - tpsTicks) * 1000f / (now - tpsAt);
+            tps = Math.min(20f, tps * 0.5f + measured * 0.5f);
+            tpsTicks = ticks;
+            tpsAt = now;
+        }
+        double dx = player.getX() - player.xo, dz = player.getZ() - player.zo;
+        bps = bps * 0.9f + (float) Math.sqrt(dx * dx + dz * dz) * 20f * 0.1f;
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[] {"FPS", String.valueOf(mc.getFps())});
+        rows.add(new String[] {"BPS", String.format(java.util.Locale.ROOT, "%.1f", bps)});
+        if (!mc.isPaused()) rows.add(new String[] {"TPS", String.format(java.util.Locale.ROOT, "%.1f", tps)});
+        if (mc.getConnection() != null && !mc.hasSingleplayerServer()) {
+            PlayerInfo info = mc.getConnection().getPlayerInfo(player.getUUID());
+            if (info != null) rows.add(new String[] {"Пинг", info.getLatency() + " ms"});
+        }
+        int pw = listWidth(font, "Stats", rows);
+        list(g, font, "Stats", rows, w - pw - 8, y, accent);
+        return y + 18 + rows.size() * ROW + 2;
+    }
+
+    // ---------- Resources: PvP items in the inventory ----------
+
+    private static final net.minecraft.world.item.Item[] RESOURCES = {
+            net.minecraft.world.item.Items.TOTEM_OF_UNDYING, net.minecraft.world.item.Items.ENCHANTED_GOLDEN_APPLE,
+            net.minecraft.world.item.Items.GOLDEN_APPLE, net.minecraft.world.item.Items.ENDER_PEARL,
+            net.minecraft.world.item.Items.EXPERIENCE_BOTTLE, net.minecraft.world.item.Items.CHORUS_FRUIT};
+
+    private static void resources(GuiGraphics g, Font font, Player player, int w, int y, int accent) {
+        int[] counts = new int[RESOURCES.length];
+        var inv = player.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack stack = inv.getItem(i);
+            for (int k = 0; k < RESOURCES.length; k++) {
+                if (stack.is(RESOURCES[k])) counts[k] += stack.getCount();
+            }
+        }
+        int shown = 0;
+        for (int c : counts) if (c > 0) shown++;
+        if (shown == 0) return;
+        int pw = shown * 22 + PAD * 2 - 4;
+        int x = w - pw - 8;
+        panel(g, x, y, pw, 30);
+        int ix = x + PAD;
+        for (int k = 0; k < RESOURCES.length; k++) {
+            if (counts[k] == 0) continue;
+            g.renderItem(new ItemStack(RESOURCES[k]), ix, y + 3);
+            String n = String.valueOf(counts[k]);
+            text(g, font, n, ix + 9 - width(font, n) / 2, y + 20, counts[k] > 0 ? TEXT : MUTED);
+            ix += 22;
+        }
+    }
+
+    // ---------- ShulkerView ----------
+
+    public static boolean isShulker(ItemStack stack) {
+        return net.minecraft.world.level.block.Block.byItem(stack.getItem())
+                instanceof net.minecraft.world.level.block.ShulkerBoxBlock;
+    }
+
+    /** The 27 slots of a shulker box as a grid next to the mouse. */
+    public static void shulker(GuiGraphics g, ItemStack box, int mouseX, int mouseY) {
+        Minecraft mc = Minecraft.getInstance();
+        Font font = mc.font;
+        var items = net.minecraft.core.NonNullList.withSize(27, ItemStack.EMPTY);
+        var contents = box.get(net.minecraft.core.component.DataComponents.CONTAINER);
+        if (contents != null) contents.copyInto(items);
+        int pw = 9 * 18 + PAD * 2, ph = 3 * 18 + 22;
+        int x = Math.min(mouseX + 10, g.guiWidth() - pw - 4);
+        int y = Math.max(4, Math.min(mouseY - ph - 6, g.guiHeight() - ph - 4));
+        panel(g, x, y, pw, ph);
+        g.fill(x + PAD, y + 6, x + PAD + 2, y + 10, Config.accent());
+        text(g, font, cut(font, box.getHoverName().getString(), pw - PAD * 2 - 6), x + PAD + 5, y + 4, TEXT);
+        for (int i = 0; i < 27; i++) {
+            int sx = x + PAD + (i % 9) * 18, sy = y + 17 + (i / 9) * 18;
+            g.fill(sx, sy, sx + 16, sy + 16, 0x30FFFFFF);
+            ItemStack stack = items.get(i);
+            if (!stack.isEmpty()) {
+                g.renderItem(stack, sx, sy);
+                g.renderItemDecorations(font, stack, sx, sy);
+            }
+        }
+    }
+
+    // ---------- Hotbar: glass panel instead of the vanilla one ----------
+
+    /** Draws our hotbar; the vanilla one is cancelled by GuiMixin while this is on. */
+    public static void hotbar(GuiGraphics g) {
+        Minecraft mc = Minecraft.getInstance();
+        Player player = mc.player;
+        if (player == null) return;
+        Font font = mc.font;
+        int accent = Config.accent();
+        int w = g.guiWidth(), h = g.guiHeight();
+        int slot = 20;
+        int pw = 9 * slot + 4;
+        int x = (w - pw) / 2;
+        int y = h - slot - 5;
+        panel(g, x, y, pw, slot + 2);
+        var inv = player.getInventory();
+        int selected = selectedSlot(inv);
+        for (int i = 0; i < 9; i++) {
+            int sx = x + 2 + i * slot;
+            if (i == selected) {
+                rounded(g, sx, y + 1, slot, slot, withAlpha(accent, 0x55));
+                g.fill(sx + 4, y + slot, sx + slot - 4, y + slot + 1, accent);
+            }
+            ItemStack stack = inv.getItem(i);
+            if (!stack.isEmpty()) {
+                g.renderItem(stack, sx + 2, y + 3);
+                g.renderItemDecorations(font, stack, sx + 2, y + 3);
+            }
+        }
+        ItemStack off = player.getOffhandItem();
+        if (!off.isEmpty()) {
+            int ox = x - slot - 6;
+            panel(g, ox, y, slot + 2, slot + 2);
+            g.renderItem(off, ox + 3, y + 3);
+            g.renderItemDecorations(font, off, ox + 3, y + 3);
+        }
+    }
+
+    /** The selected hotbar slot; the field became private behind a getter in later 1.21 versions. */
+    private static java.lang.reflect.Field selectedField;
+    private static java.lang.reflect.Method selectedMethod;
+
+    private static int selectedSlot(Object inv) {
+        try {
+            if (selectedMethod == null && selectedField == null) {
+                try {
+                    selectedMethod = inv.getClass().getMethod("getSelectedSlot");
+                } catch (NoSuchMethodException e) {
+                    selectedField = inv.getClass().getField("selected");
+                }
+            }
+            return selectedMethod != null ? (int) selectedMethod.invoke(inv) : selectedField.getInt(inv);
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     /** The own crosshair, drawn even with the HUD panels off. */

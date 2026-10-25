@@ -15,8 +15,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class LevelTimeMixin {
     @Inject(method = "getDayTime", at = @At("HEAD"), cancellable = true, require = 0)
     private void bi4visual$night(CallbackInfoReturnable<Long> cir) {
-        if (Config.night()) {
-            cir.setReturnValue(18000L);
+        long time = Config.ambienceTime();
+        if (time >= 0) {
+            cir.setReturnValue(time);
         }
     }
 }

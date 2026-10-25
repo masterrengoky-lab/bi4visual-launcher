@@ -13,6 +13,10 @@ public final class Config {
         public String sky = "galaxy";
         /** Keep the client at midnight. */
         public boolean night = true;
+        /** Ambience, only on this client: time of day and weather ("off" leaves the server's). */
+        public String time = "off";
+        public String weather = "off";
+        public boolean shulkerView = true;
         /** Song lyrics floating in the world. */
         public boolean lyrics = true;
         /** The bi4visual HUD panels, all together and one by one. */
@@ -52,6 +56,10 @@ public final class Config {
         public boolean inventory = false;
         public boolean coords = true;
         public boolean keybinds = true;
+        /** Interface: FPS/BPS/TPS/ping panel, counts of PvP items, our own glass hotbar. */
+        public boolean stats = true;
+        public boolean resources = false;
+        public boolean hotbar = false;
         public boolean media = true;
         /** Utility: ".рщьу" typed in the Russian layout becomes "/home"; a click sound on hits. */
         public boolean commandFix = true;
@@ -135,6 +143,19 @@ public final class Config {
             Data d = GSON.fromJson(r, Data.class);
             if (d != null) save(d);
         }
+    }
+
+    /** The day time Ambience holds the client at, or -1 to leave it alone. */
+    public static long ambienceTime() {
+        Data d = get();
+        if (d.night) return 18000L;
+        return switch (d.time == null ? "off" : d.time) {
+            case "day" -> 6000L;
+            case "sunset" -> 12600L;
+            case "night" -> 18000L;
+            case "sunrise" -> 23300L;
+            default -> -1L;
+        };
     }
 
     public static boolean night() {

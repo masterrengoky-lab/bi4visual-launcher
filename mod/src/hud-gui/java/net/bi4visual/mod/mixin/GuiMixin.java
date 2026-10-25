@@ -29,6 +29,15 @@ public class GuiMixin {
         Hud.render(graphics);
     }
 
+    /** The glass hotbar replaces the vanilla one. */
+    @Inject(method = "renderItemHotbar", at = @At("HEAD"), cancellable = true, require = 0)
+    private void bi4visual$hotbar(GuiGraphics graphics, DeltaTracker delta, CallbackInfo ci) {
+        Config.Data d = Config.get();
+        if (!d.hotbar || !d.hud) return;
+        ci.cancel();
+        Hud.hotbar(graphics);
+    }
+
     /** Our own crosshair is drawn by the HUD instead. */
     @Inject(method = "renderCrosshair", at = @At("HEAD"), cancellable = true, require = 0)
     private void bi4visual$crosshair(GuiGraphics graphics, DeltaTracker delta, CallbackInfo ci) {

@@ -17,7 +17,9 @@
     "CosmeticsMixin",
     "HandMixin",
     "ItemHandMixin",
-    "PlayerModelMixin"
+    "PlayerModelMixin",
+    "WeatherMixin",
+    "ShulkerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
