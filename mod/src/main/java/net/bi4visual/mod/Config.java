@@ -44,6 +44,8 @@ public final class Config {
         public String cape = "";
         /** Size of swords in first person, percent. */
         public int swordSize = 100;
+        /** Per sword: item id path ("diamond_sword") to a cosmetic name; swords not listed use {@code cosmetic}. */
+        public java.util.Map<String, String> swords = new java.util.HashMap<>();
         public boolean trails = false;
         public String atmosphere = "off";
         /** Interface panels: inventory contents, coordinates, module binds, playing track. */

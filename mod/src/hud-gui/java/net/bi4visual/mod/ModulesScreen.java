@@ -53,6 +53,8 @@ public class ModulesScreen extends Screen {
     private static String capturing;
     /** Which part of the Cosmetics section is open: model, swords or world. */
     private static String cosTab = "swords";
+    /** Which sword kind the swords grid picks a model for; "" is all swords. */
+    private static String swordKind = "";
 
     private final List<AbstractWidget> content = new ArrayList<>();
     private EditBox search;
@@ -239,25 +241,47 @@ public class ModulesScreen extends Screen {
         names.add("");
         names.addAll(Cosmetics.names());
         if (names.size() == 1) return;
+        // Which sword the pick is for: all of them, or one kind.
+        int kx = cx;
+        for (String[] kind : Cosmetics.SWORDS) {
+            int kw = font.width(Fonts.small(kind[1])) + 10;
+            add(new MenuButton(kx, cy, kw, 12, kind[1], (g, b, hover) -> drawTab(g, b, kind[1], kind[0].equals(swordKind), hover), b -> {
+                swordKind = kind[0];
+                rebuildContent();
+            }));
+            kx += kw + 3;
+        }
+        cy += 17;
+        ch -= 17;
         int cols = 5;
         int w = (cw - (cols - 1) * 5) / cols;
         int h = 40;
         int visible = Math.max(1, ch / (h + 5));
         int rows = (names.size() + cols - 1) / cols;
         scroll = Math.max(0, Math.min(scroll, rows - visible));
+        String kind = swordKind;
         for (int i = 0; i < names.size(); i++) {
             int row = i / cols - scroll;
             if (row < 0 || row >= visible) continue;
             String name = names.get(i);
             int x = cx + (i % cols) * (w + 5);
             int y = cy + row * (h + 5);
-            add(new MenuButton(x, y, w, h, name, (g, b, hover) -> drawCosmetic(g, b, name, hover), b -> {
+            add(new MenuButton(x, y, w, h, name, (g, b, hover) -> drawCosmetic(g, b, name, kind, hover), b -> {
                 Config.Data d = Config.get();
-                d.cosmetic = name;
+                if (kind.isEmpty()) d.cosmetic = name;
+                else d.swords.put(kind, name);
                 Config.save(d);
-                Hud.notify(name.isEmpty() ? "Косметика" : name, name.isEmpty() ? "выключена" : "в руке");
+                String who = kind.isEmpty() ? "все мечи" : kindName(kind);
+                Hud.notify(name.isEmpty() ? "Косметика" : name, name.isEmpty() ? "убрана: " + who : who);
             }));
         }
+    }
+
+    private static String kindName(String kind) {
+        for (String[] k : Cosmetics.SWORDS) {
+            if (k[0].equals(kind)) return k[1];
+        }
+        return kind;
     }
 
     private void waypoints() {
@@ -539,9 +563,9 @@ public class ModulesScreen extends Screen {
         g.drawString(font, Fonts.small(hex), x + w - 6 - font.width(Fonts.small(hex)), y + 18, MUTED, false);
     }
 
-    private static void drawCosmetic(GuiGraphics g, Button b, String name, boolean hover) {
+    private static void drawCosmetic(GuiGraphics g, Button b, String name, String kind, boolean hover) {
         int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
-        boolean selected = name.equals(Config.get().cosmetic);
+        boolean selected = name.equals(Cosmetics.chosen(kind));
         if (selected) rounded(g, x - 1, y - 1, w + 2, h + 2, Config.accent());
         rounded(g, x, y, w, h, hover ? CARD_HOVER : CARD);
         Font font = font();
@@ -549,7 +573,7 @@ public class ModulesScreen extends Screen {
             String none = "✕";
             g.drawString(font, Fonts.hud(none), x + (w - font.width(Fonts.hud(none))) / 2, y + 10, MUTED, false);
         } else {
-            g.renderItem(Cosmetics.preview(name), x + (w - 16) / 2, y + 5);
+            g.renderItem(Cosmetics.preview(name, kind), x + (w - 16) / 2, y + 5);
         }
         String label = name.isEmpty() ? "Без косметики" : name;
         while (label.length() > 3 && font.width(Fonts.small(label)) > w - 6) label = label.substring(0, label.length() - 2);

@@ -62,9 +62,29 @@ public final class Cosmetics {
         return capes;
     }
 
-    /** A diamond sword showing the named model, for the menu previews. */
-    public static ItemStack preview(String name) {
-        ItemStack stack = new ItemStack(Items.DIAMOND_SWORD);
+    /** Sword kinds that can each get their own model: item id path and name in the menu. */
+    public static final String[][] SWORDS = {
+            {"", "Все"}, {"wooden_sword", "Дерево"}, {"stone_sword", "Камень"}, {"iron_sword", "Железо"},
+            {"golden_sword", "Золото"}, {"diamond_sword", "Алмаз"}, {"netherite_sword", "Незерит"}};
+
+    /** The model picked for a sword kind ("" = the one for all swords). */
+    public static String chosen(String sword) {
+        Config.Data d = Config.get();
+        if (!sword.isEmpty() && d.swords != null && d.swords.containsKey(sword)) return d.swords.get(sword);
+        return d.cosmetic == null ? "" : d.cosmetic;
+    }
+
+    /** A sword of that kind showing the named model, for the menu previews. */
+    public static ItemStack preview(String name, String sword) {
+        var item = switch (sword) {
+            case "wooden_sword" -> Items.WOODEN_SWORD;
+            case "stone_sword" -> Items.STONE_SWORD;
+            case "iron_sword" -> Items.IRON_SWORD;
+            case "golden_sword" -> Items.GOLDEN_SWORD;
+            case "netherite_sword" -> Items.NETHERITE_SWORD;
+            default -> Items.DIAMOND_SWORD;
+        };
+        ItemStack stack = new ItemStack(item);
         stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(List.of(), List.of(), List.of(name), List.of()));
         return stack;
     }
