@@ -13,6 +13,7 @@ import {
   type Skin,
 } from "./lib/api";
 import TitleBar from "./components/TitleBar";
+import UpdateBanner from "./components/UpdateBanner";
 import Backdrop from "./components/Backdrop";
 import SkinViewer from "./components/SkinViewer";
 import Avatar from "./components/Avatar";
@@ -133,6 +134,7 @@ export default function App() {
         preset={settings?.bg_preset ?? "scene"}
       />
       <TitleBar />
+      <UpdateBanner />
 
       <div className="layout">
         <nav className="side">
