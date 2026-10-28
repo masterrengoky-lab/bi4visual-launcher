@@ -303,11 +303,17 @@ fn has_fabric_api(paths: &Paths, inst: &Instance) -> bool {
             .unwrap_or(false)
 }
 
+/// Titles match ignoring case and spaces ("EntityCulling" is "Entity Culling").
+fn same_title(a: &str, b: &str) -> bool {
+    let norm = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_lowercase();
+    norm(a) == norm(b)
+}
+
 /// Finds a mod on Modrinth by its exact title for the instance's version and installs it.
 /// False when Modrinth has no build of it for this version.
 async fn install_by_title(client: &reqwest::Client, paths: &Paths, inst: &mut Instance, title: &str) -> anyhow::Result<bool> {
     let found = modrinth::search(client, title, ProjectType::Mod, Some(&inst.game_version), Some("fabric"), 0).await?;
-    let Some(hit) = found.hits.into_iter().find(|h| h.title.eq_ignore_ascii_case(title)) else {
+    let Some(hit) = found.hits.into_iter().find(|h| same_title(&h.title, title)) else {
         return Ok(false);
     };
     modrinth::install_mod(client, paths, inst, &hit.project_id).await?;
@@ -554,8 +560,19 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
             if let Err(e) = cosmetics::apply(&st.paths, &inst.game_dir(&st.paths)) {
                 log(format!("Не удалось подключить косметику: {e}"));
             }
-            for (wanted, title) in [(settings.hold_my_items, "Hold My Items"), (settings.voice_chat, "Simple Voice Chat")] {
-                if !wanted || inst.mods.iter().any(|m| m.title.eq_ignore_ascii_case(title)) {
+            let fast = settings.performance_mods;
+            for (wanted, title) in [
+                (settings.hold_my_items, "Hold My Items"),
+                (settings.voice_chat, "Simple Voice Chat"),
+                // Speed-ups: rendering, game logic, memory, start-up, hidden entities.
+                (fast, "Sodium"),
+                (fast, "Lithium"),
+                (fast, "ImmediatelyFast"),
+                (fast, "FerriteCore"),
+                (fast, "ModernFix"),
+                (fast, "Entity Culling"),
+            ] {
+                if !wanted || inst.mods.iter().any(|m| same_title(&m.title, title)) {
                     continue;
                 }
                 match install_by_title(&st.client, &st.paths, &mut inst, title).await {

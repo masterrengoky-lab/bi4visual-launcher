@@ -30,6 +30,7 @@ export type Settings = {
   ui_sounds: boolean;
   hold_my_items: boolean;
   voice_chat: boolean;
+  performance_mods: boolean;
 };
 
 export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge";

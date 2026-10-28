@@ -57,6 +57,8 @@ pub struct Settings {
     pub hold_my_items: bool,
     /// Put Simple Voice Chat into Fabric instances from Modrinth.
     pub voice_chat: bool,
+    /// Put the speed-up mods (Sodium, Lithium and friends) into Fabric instances from Modrinth.
+    pub performance_mods: bool,
 }
 
 impl Default for Settings {
@@ -90,6 +92,7 @@ impl Default for Settings {
             ui_sounds: true,
             hold_my_items: true,
             voice_chat: true,
+            performance_mods: true,
         }
     }
 }

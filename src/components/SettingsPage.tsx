@@ -288,6 +288,9 @@ function GameTab({ settings: s, set }: TabProps) {
         <Row label="Simple Voice Chat" hint="Голосовой чат на серверах, где он есть">
           <Toggle value={s.voice_chat} onChange={(v) => set("voice_chat", v)} />
         </Row>
+        <Row label="Оптимизация" hint="Sodium, Lithium, ImmediatelyFast, FerriteCore, ModernFix, Entity Culling: больше FPS">
+          <Toggle value={s.performance_mods} onChange={(v) => set("performance_mods", v)} />
+        </Row>
       </Section>
 
       <CosmeticsSection />
