@@ -1,0 +1,14 @@
+anthropic>=2.3.0
+requests
+vosk
+sounddevice
+pyttsx3
+edge-tts
+pyautogui
+pyperclip
+pygetwindow
+psutil
+pycaw
+comtypes
+pillow
+send2trash

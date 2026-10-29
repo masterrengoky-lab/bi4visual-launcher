@@ -1,0 +1,29 @@
+{
+  "name": "Джарвис",
+  "wake_words": ["джарвис", "джарвиз", "жарвис", "джервис", "jarvis"],
+  "greeting": "Джарвис на связи.",
+  "brain": "ollama",
+  "claude": {
+    "api_key": "",
+    "model": "claude-opus-5-5",
+    "effort": "low",
+    "web_search": true
+  },
+  "ollama": {
+    "url": "http://localhost:11434",
+    "model": "qwen2.5:7b"
+  },
+  "tts": {
+    "engine": "edge",
+    "edge_voice": "ru-RU-DmitryNeural",
+    "sapi_rate": 190,
+    "speak_in_text_mode": false
+  },
+  "stt": {
+    "model_path": "models/vosk-model-small-ru-0.22",
+    "mic_device": null
+  },
+  "confirm_dangerous": true,
+  "follow_up_sec": 6,
+  "conversation_timeout_sec": 300
+}

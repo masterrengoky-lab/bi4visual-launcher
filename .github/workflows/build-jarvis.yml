@@ -1,0 +1,56 @@
+name: Build Jarvis
+
+on:
+  push:
+    branches: [jarvis-assistant]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Download Vosk model
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip -OutFile vosk.zip
+          Expand-Archive vosk.zip -DestinationPath models
+
+      - name: Build Jarvis.exe
+        run: >
+          pyinstaller --noconfirm --onefile --console --name Jarvis
+          --add-data "config.json;."
+          --add-data "models;models"
+          --collect-all vosk
+          --collect-all sounddevice
+          --collect-all _sounddevice_data
+          --collect-all pyttsx3
+          --collect-all edge_tts
+          --collect-all pycaw
+          --collect-submodules comtypes
+          --collect-data certifi
+          assistant.py
+
+      - name: Self-test
+        run: dist\Jarvis.exe --selftest
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: jarvis-v1.${{ github.run_number }}
+          name: Джарвис v1.${{ github.run_number }}
+          body: Голосовой помощник для Windows. Скачай Jarvis.exe и запусти.
+          prerelease: true
+          make_latest: false
+          files: dist/Jarvis.exe
