@@ -22,7 +22,7 @@ pub mod rules;
 pub mod settings;
 pub mod skins;
 
-pub const LAUNCHER_NAME: &str = "bi4visual-launcher";
+pub const LAUNCHER_NAME: &str = "novavis-launcher";
 pub const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Progress of a long operation, reported to the UI.

@@ -14,7 +14,7 @@ export const COSMETICS: { id: CosmeticId; name: string; icon: string; slot: "hea
   { id: "crown", name: "Корона", icon: "👑", slot: "head" },
   { id: "wings_angel", name: "Крылья ангела", icon: "🕊️", slot: "back" },
   { id: "wings_demon", name: "Крылья демона", icon: "🦇", slot: "back" },
-  { id: "cape", name: "Плащ bi4visual", icon: "🧣", slot: "cape" },
+  { id: "cape", name: "Плащ NovaVis", icon: "🧣", slot: "cape" },
 ];
 
 /** Picking an item replaces another one in the same slot. */

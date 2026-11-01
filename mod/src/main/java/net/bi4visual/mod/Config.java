@@ -80,6 +80,23 @@ public final class Config {
         /** Per sword: item id path ("diamond_sword") to a cosmetic name; swords not listed use {@code cosmetic}. */
         public java.util.Map<String, String> swords = new java.util.HashMap<>();
         public boolean trails = false;
+        /** NovaVis styles: glow (soft dots), rainbow, ribbon, vapor. */
+        public String trailStyle = "rainbow";
+        /** HitEffect: off, shards, lightning, bubbles, crystal. */
+        public String hitStyle = "shards";
+        /** KillEffect: off, grave, skull, blood, sphere. */
+        public String killStyle = "skull";
+        /** JumpCircle: ring, double, stars. */
+        public String jumpStyle = "stars";
+        /** BlockOverlay: fill, outline, pulse, rainbow, glass. */
+        public String overlayStyle = "outline";
+        /** Companion: off, orbs, electric. */
+        public String companion = "off";
+        /** WorldLines: off, white, neon, lightning. */
+        public String worldLines = "off";
+        public boolean shootingStars = false;
+        /** FireFlies: off, few, many. */
+        public String fireflies = "off";
         public String atmosphere = "off";
         /** Interface panels: inventory contents, coordinates, module binds, playing track. */
         public boolean inventory = false;

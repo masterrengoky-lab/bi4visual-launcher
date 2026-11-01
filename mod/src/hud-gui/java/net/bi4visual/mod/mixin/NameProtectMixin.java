@@ -15,6 +15,6 @@ public abstract class NameProtectMixin {
     private static String bi4visual$protect(String text) {
         if (text == null || text.isEmpty() || !Config.get().nameProtect) return text;
         String name = Minecraft.getInstance().getUser().getName();
-        return name != null && name.length() > 2 && text.contains(name) ? text.replace(name, "bi4visual") : text;
+        return name != null && name.length() > 2 && text.contains(name) ? text.replace(name, net.bi4visual.mod.Brand.NAME) : text;
     }
 }

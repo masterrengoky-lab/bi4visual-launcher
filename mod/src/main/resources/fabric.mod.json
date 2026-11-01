@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "bi4visual",
   "version": "${version}",
-  "name": "bi4visual",
-  "description": "Визуалы bi4visual launcher: текст играющей песни прямо в мире.",
+  "name": "NovaVis",
+  "description": "Визуалы лаунчера NovaVis: эффекты, HUD и меню на Right Shift.",
   "authors": [
     "bi4visual"
   ],

@@ -154,7 +154,7 @@ function CreateForm({
           </label>
         )}
       </div>
-      <small className="muted">Сборки только на Fabric 1.21.4 и новее: на них работают визуалы bi4visual (меню в игре на правый Shift).</small>
+      <small className="muted">Сборки только на Fabric 1.21.4 и новее: на них работают визуалы NovaVis (меню в игре на правый Shift).</small>
       <label className="field">
         <span>Название</span>
         <input

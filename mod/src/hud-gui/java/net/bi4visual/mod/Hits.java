@@ -43,7 +43,8 @@ public final class Hits {
             if (d.hitWave) effects.add(new Effect(Kind.WAVE, target.getX(), target.getY() + target.getBbHeight() / 2, target.getZ(), w, null, now));
             while (effects.size() > 40) effects.remove(0);
         }
-        if (target instanceof LivingEntity living && (d.damageNumbers || d.deathEffect)) {
+        Effects.hit(target);
+        if (target instanceof LivingEntity living && (d.damageNumbers || d.deathEffect || !"off".equals(d.killStyle))) {
             Target old = followed.get(living.getId());
             followed.put(living.getId(), new Target(living, old != null ? old.health : living.getHealth(), now));
         }
@@ -65,8 +66,10 @@ public final class Hits {
                     double jitter = (en.getRandom().nextDouble() - 0.5) * 0.5;
                     effects.add(new Effect(Kind.NUMBER, en.getX() + jitter, en.getY() + en.getBbHeight() + 0.2, en.getZ() + jitter, 0, text, now));
                 }
-                if ((en.isDeadOrDying() || en.isRemoved()) && d.deathEffect && t.health > 0) {
-                    effects.add(new Effect(Kind.DEATH, en.getX(), en.getY(), en.getZ(), en.getBbWidth(), null, now));
+                boolean kill = d.deathEffect || !"off".equals(d.killStyle);
+                if ((en.isDeadOrDying() || en.isRemoved()) && kill && t.health > 0) {
+                    if (d.deathEffect) effects.add(new Effect(Kind.DEATH, en.getX(), en.getY(), en.getZ(), en.getBbWidth(), null, now));
+                    Effects.kill(en.getX(), en.getY(), en.getZ(), en.getBbWidth(), en.getBbHeight());
                     it.remove();
                     continue;
                 }

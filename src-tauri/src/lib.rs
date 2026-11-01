@@ -131,7 +131,7 @@ fn reg(args: &[&str]) -> std::io::Result<std::process::Output> {
 fn autostart_get() -> bool {
     #[cfg(windows)]
     {
-        reg(&["query", RUN_KEY, "/v", "bi4visual launcher"]).map(|o| o.status.success()).unwrap_or(false)
+        reg(&["query", RUN_KEY, "/v", "NovaVis"]).map(|o| o.status.success()).unwrap_or(false)
     }
     #[cfg(not(windows))]
     {
@@ -146,9 +146,9 @@ fn autostart_set(enabled: bool) -> Res<()> {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         let value = format!("\"{}\"", exe.display());
         let out = if enabled {
-            reg(&["add", RUN_KEY, "/v", "bi4visual launcher", "/t", "REG_SZ", "/d", &value, "/f"])
+            reg(&["add", RUN_KEY, "/v", "NovaVis", "/t", "REG_SZ", "/d", &value, "/f"])
         } else {
-            reg(&["delete", RUN_KEY, "/v", "bi4visual launcher", "/f"])
+            reg(&["delete", RUN_KEY, "/v", "NovaVis", "/f"])
         }
         .map_err(|e| e.to_string())?;
         if !out.status.success() && enabled {
@@ -532,7 +532,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
             inst.loader_version = None;
             inst.version_id = None;
             inst.save(&st.paths)?;
-            log(format!("Сборка {} переведена на Fabric, чтобы работали визуалы bi4visual", inst.name));
+            log(format!("Сборка {} переведена на Fabric, чтобы работали визуалы NovaVis", inst.name));
         }
         let version = instances::ensure_ready(&st.client, &st.paths, &mut inst, &progress).await?;
         let major = VersionJson::load_resolved(&st.paths, &version)?.java_major();
@@ -551,7 +551,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
             match modrinth::install_mod(&st.client, &st.paths, &mut inst, FABRIC_API).await {
                 Ok(_) => {
                     inst.save(&st.paths)?;
-                    log("Поставил Fabric API, он нужен моду bi4visual".into());
+                    log("Поставил Fabric API, он нужен моду NovaVis".into());
                 }
                 Err(e) => log(format!("Не удалось поставить Fabric API: {e}")),
             }
@@ -586,9 +586,9 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
             }
         }
         log(if lyrics_mod {
-            format!("Мод bi4visual установлен ({} Fabric), меню визуалов в игре — правый Shift", inst.game_version)
+            format!("Мод NovaVis установлен ({} Fabric), меню визуалов в игре — правый Shift", inst.game_version)
         } else {
-            format!("Визуалы bi4visual не будут работать: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
+            format!("Визуалы NovaVis не будут работать: нужен Fabric 1.21.4 или новее, а у сборки {} {:?}", inst.game_version, inst.loader)
         });
         Ok((plan, inst.id, lyrics_mod))
     }
@@ -724,5 +724,5 @@ pub fn run() {
             cosmetics_clear,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running bi4visual launcher");
+        .expect("error while running NovaVis");
 }

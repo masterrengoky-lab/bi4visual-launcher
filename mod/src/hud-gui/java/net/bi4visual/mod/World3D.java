@@ -33,9 +33,12 @@ public final class World3D {
     static void jumped(double x, double y, double z) {
         if (!Config.get().jumpCircles) return;
         synchronized (rings) {
-            rings.add(new Ring(x, y + 0.02, z, System.currentTimeMillis()));
+            long now = System.currentTimeMillis();
+            rings.add(new Ring(x, y + 0.02, z, now));
+            if ("double".equals(Config.get().jumpStyle)) rings.add(new Ring(x, y + 0.03, z, now + 160));
             while (rings.size() > 8) rings.remove(0);
         }
+        if ("stars".equals(Config.get().jumpStyle)) Effects.jumpStars(x, y, z);
     }
 
     static void track(double x, double y, double z) {
@@ -69,6 +72,7 @@ public final class World3D {
             for (Iterator<Ring> it = rings.iterator(); it.hasNext(); ) {
                 Ring r = it.next();
                 float t = (now - r.born) / (float) RING_LIFE;
+                if (t < 0f) continue;
                 if (t >= 1f) {
                     it.remove();
                     continue;
@@ -85,9 +89,17 @@ public final class World3D {
             // The trail and the cosmetics are around the player, only third person sees them.
         } else {
             drawn |= cosmetics(sink, pose, camera, mc, player, eye, now, accent);
+            String style = Config.get().trailStyle;
             synchronized (trail) {
                 trail.removeIf(dot -> now - dot.born > TRAIL_LIFE);
-                for (Dot dot : trail) {
+                if (style != null && !style.equals("glow")) {
+                    List<double[]> points = new ArrayList<>();
+                    for (Dot dot : trail) {
+                        points.add(new double[] {dot.x - eye.x, dot.y - eye.y, dot.z - eye.z, (now - dot.born) / (double) TRAIL_LIFE});
+                    }
+                    drawn |= Effects.trail(sink, pose, camera, style, points, accent);
+                }
+                else for (Dot dot : trail) {
                     float t = (now - dot.born) / (float) TRAIL_LIFE;
                     int a = (int) (200 * (1f - t));
                     if (a < 6) continue;
@@ -109,15 +121,13 @@ public final class World3D {
                 double cx = pos.getX() + (box.minX + box.maxX) / 2 - eye.x;
                 double cy = pos.getY() + (box.minY + box.maxY) / 2 - eye.y;
                 double cz = pos.getZ() + (box.minZ + box.maxZ) / 2 - eye.z;
-                pose.pushPose();
-                pose.translate((float) cx, (float) cy, (float) cz);
-                Models.cube(sink, pose, 0, 0, 0, sx, sy, sz, 0x48000000 | accent);
-                pose.popPose();
+                Effects.overlay(sink, pose, Config.get().overlayStyle, cx, cy, cz, sx, sy, sz, accent);
                 drawn = true;
             }
         }
 
         drawn |= Hits.render(sink, pose, camera, eye, now, accent);
+        drawn |= Effects.render(sink, pose, camera, mc, player, eye, accent);
 
         String dim = mc.level.dimension().toString();
         for (Config.Waypoint w : Config.get().waypoints) {

@@ -8,7 +8,7 @@ export default function TitleBar() {
       <div className="titlebar-spacer" data-tauri-drag-region />
       <div className="titlebar-name" data-tauri-drag-region>
         <img src="/logo.svg" alt="" width={18} height={18} />
-        BI4VISUAL LAUNCHER
+        NOVAVIS
       </div>
       <div className="titlebar-buttons">
         <button onClick={() => win.minimize()} aria-label="Свернуть">─</button>

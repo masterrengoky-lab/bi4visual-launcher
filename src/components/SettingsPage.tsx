@@ -263,7 +263,7 @@ function GameTab({ settings: s, set }: TabProps) {
   const memIndex = i === -1 ? MEMORY_STEPS.length - 1 : i;
   return (
     <>
-      <Section title="Игра" note="Визуалы bi4visual настраиваются прямо в игре: нажми правый Shift">
+      <Section title="Игра" note="Визуалы NovaVis настраиваются прямо в игре: нажми правый Shift">
         <Row label="Память для игры" hint="Больше 6 ГБ нужно только большим модпакам">
           <div className="range">
             <input type="range" min={0} max={MEMORY_STEPS.length - 1} value={memIndex} onChange={(e) => set("memory_mb", MEMORY_STEPS[Number(e.target.value)])} />
@@ -348,7 +348,7 @@ function LauncherTab({ settings, log }: Props) {
 
   async function copyReport() {
     const report = [
-      `bi4visual launcher ${version}`,
+      `NovaVis ${version}`,
       navigator.userAgent,
       `Настройки: ${JSON.stringify({ ...settings, java_path: settings.java_path ? "свой" : null })}`,
       "Журнал игры (последние строки):",
@@ -364,7 +364,7 @@ function LauncherTab({ settings, log }: Props) {
       <div className="app-card">
         <img src="/logo.svg" alt="" width={44} height={44} />
         <div className="grow">
-          <b>bi4visual launcher</b>
+          <b>NovaVis</b>
           <small>Версия {version}</small>
         </div>
         <button className="ghost-btn" onClick={() => openUrl(`${REPO}/actions`)}>⟳ Новые версии</button>

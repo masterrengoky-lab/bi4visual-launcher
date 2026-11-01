@@ -1,3 +1,17 @@
+# NovaVis
+
+Ветка `novavis`: отдельный визуальный лаунчер NovaVis на основе bi4visual launcher.
+Свои имя, иконка, папка данных (`%APPDATA%\novavis-launcher`) и релизы `novavis-v*`.
+Скачать: `NovaVis.bat` из последнего релиза `novavis-v*`, запустить двойным кликом.
+
+Визуалы в игре (Fabric 1.21.4+, меню на правый Shift): HitEffect (осколки, молнии, пузыри,
+Crystal Rift), DeathPoint (надгробие, череп, лужа, сфера), Trails (радуга, лента, Glass Vapor),
+JumpCircle со звёздами, BlockOverlay (контур, пульс, радуга, стекло), Companion (шары, электро),
+WorldLines, ShootingStars, FireFlies и всё, что было в bi4visual.
+Только визуал: ESP, Chams, подсветки сквозь стены и боевых функций нет и не будет.
+
+---
+
 # bi4visual launcher
 
 Лаунчер Minecraft: Java Edition. Одна большая кнопка «Играть», остальное — в настройках.

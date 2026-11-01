@@ -57,7 +57,7 @@ public class MenuScreen extends net.minecraft.client.gui.screens.Screen {
     }
 
     public MenuScreen() {
-        super(Component.literal("bi4visual"));
+        super(Component.literal(Brand.NAME));
     }
 
     /** True once after the player asked for the vanilla menu. */
@@ -88,7 +88,7 @@ public class MenuScreen extends net.minecraft.client.gui.screens.Screen {
                 b -> minecraft.setScreen(new JoinMultiplayerScreen(this))));
         addRenderableWidget(new MenuButton(x, y + 27, bw, bh, "Одиночная игра", row(ICON_PLAYER, true),
                 b -> minecraft.setScreen(new SelectWorldScreen(this))));
-        addRenderableWidget(new MenuButton(x, y + 54, bw, bh, "Визуалы bi4visual", row(ICON_GRID, false),
+        addRenderableWidget(new MenuButton(x, y + 54, bw, bh, "Визуалы " + Brand.NAME, row(ICON_GRID, false),
                 b -> minecraft.setScreen(new ModulesScreen())));
         int half = (bw - 6) / 2;
         addRenderableWidget(new MenuButton(x, y + 81, half, bh, "Настройки", row(ICON_GEAR, false),
@@ -197,7 +197,7 @@ public class MenuScreen extends net.minecraft.client.gui.screens.Screen {
             String sub = "Как твой день? Сейчас станет лучше!";
             g.drawString(font, Fonts.small(sub), cx - font.width(Fonts.small(sub)) / 2, cy - 38, MUTED, false);
         }
-        g.drawString(font, Fonts.small("Сделано с любовью · bi4visual"), 30, height - 25, MUTED, false);
+        g.drawString(font, Fonts.small("Сделано с любовью · " + Brand.NAME), 30, height - 25, MUTED, false);
     }
 
     @Override
