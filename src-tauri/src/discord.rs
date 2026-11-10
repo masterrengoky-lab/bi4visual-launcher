@@ -83,7 +83,7 @@ pub fn activity(s: &Settings, start: u64) -> Value {
     }
     a.insert("timestamps".into(), json!({ "start": start }));
     if !s.discord_image.trim().is_empty() {
-        a.insert("assets".into(), json!({ "large_image": s.discord_image.trim(), "large_text": "NovaVis" }));
+        a.insert("assets".into(), json!({ "large_image": s.discord_image.trim() }));
     }
     let buttons: Vec<Value> = [(&s.discord_button1, &s.discord_url1), (&s.discord_button2, &s.discord_url2)]
         .into_iter()
