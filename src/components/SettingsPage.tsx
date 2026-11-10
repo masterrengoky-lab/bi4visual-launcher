@@ -295,6 +295,39 @@ function GameTab({ settings: s, set }: TabProps) {
 
       <CosmeticsSection />
 
+      <Section
+        title="Статус в Discord"
+        note="Заголовок карточки — это имя твоего приложения в Discord. Создай его на discord.com/developers/applications (New Application, назови как хочешь), скопируй Application ID и вставь ниже. Кнопки видят другие, у себя Discord их не показывает"
+      >
+        <Row label="Показывать статус" hint="Пока открыт лаунчер, таймер считает время игры">
+          <Toggle value={s.discord_rpc} onChange={(v) => set("discord_rpc", v)} />
+        </Row>
+        <Row label="Application ID" hint="Цифры из раздела General Information">
+          <input className="input wide" value={s.discord_app_id} onChange={(e) => set("discord_app_id", e.target.value.replace(/\D/g, ""))} />
+        </Row>
+        <Row label="Первая строка">
+          <input className="input wide" value={s.discord_details} onChange={(e) => set("discord_details", e.target.value)} />
+        </Row>
+        <Row label="Вторая строка">
+          <input className="input wide" value={s.discord_state} onChange={(e) => set("discord_state", e.target.value)} />
+        </Row>
+        <Row label="Картинка" hint="Ссылка на картинку или ключ из Rich Presence → Art Assets">
+          <input className="input wide" value={s.discord_image} onChange={(e) => set("discord_image", e.target.value)} />
+        </Row>
+        <Row label="Кнопка 1" hint="Название и ссылка https://">
+          <div className="row">
+            <input className="input mini" value={s.discord_button1} onChange={(e) => set("discord_button1", e.target.value)} />
+            <input className="input wide" placeholder="https://t.me/..." value={s.discord_url1} onChange={(e) => set("discord_url1", e.target.value)} />
+          </div>
+        </Row>
+        <Row label="Кнопка 2" hint="Название и ссылка https://">
+          <div className="row">
+            <input className="input mini" value={s.discord_button2} onChange={(e) => set("discord_button2", e.target.value)} />
+            <input className="input wide" placeholder="https://discord.gg/..." value={s.discord_url2} onChange={(e) => set("discord_url2", e.target.value)} />
+          </div>
+        </Row>
+      </Section>
+
       <Section title="Во время игры">
         <Row label="Лаунчер при запуске игры">
           <Choice value={s.on_launch} options={[["keep", "Оставить"], ["minimize", "Свернуть"], ["hide", "Скрыть"]]} onChange={(v) => set("on_launch", v as Settings["on_launch"])} />

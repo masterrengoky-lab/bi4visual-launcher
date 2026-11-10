@@ -59,6 +59,18 @@ pub struct Settings {
     pub voice_chat: bool,
     /// Put the speed-up mods (Sodium, Lithium and friends) into Fabric instances from Modrinth.
     pub performance_mods: bool,
+    /// Status in Discord ("Играет в …") while the launcher is open.
+    pub discord_rpc: bool,
+    /// Id of the Discord application; its name is the big title of the status.
+    pub discord_app_id: String,
+    pub discord_details: String,
+    pub discord_state: String,
+    /// Picture: a link to an image or the key of an art asset of the application.
+    pub discord_image: String,
+    pub discord_button1: String,
+    pub discord_url1: String,
+    pub discord_button2: String,
+    pub discord_url2: String,
 }
 
 impl Default for Settings {
@@ -93,6 +105,15 @@ impl Default for Settings {
             hold_my_items: true,
             voice_chat: true,
             performance_mods: true,
+            discord_rpc: true,
+            discord_app_id: String::new(),
+            discord_details: "Yeban Client".into(),
+            discord_state: "Build #3.0".into(),
+            discord_image: "https://raw.githubusercontent.com/masterrengoky-lab/bi4visual-launcher/novavis/assets/logo.png".into(),
+            discord_button1: "Telegram".into(),
+            discord_url1: String::new(),
+            discord_button2: "Discord".into(),
+            discord_url2: String::new(),
         }
     }
 }

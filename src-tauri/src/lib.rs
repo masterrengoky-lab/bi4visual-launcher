@@ -1,5 +1,6 @@
 //! Tauri shell: exposes the core to the UI as commands and events.
 
+mod discord;
 mod media;
 
 use bi4visual_core::{
@@ -651,9 +652,11 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
     let app2 = app.clone();
     let paths = st.paths.clone();
     let started = std::time::Instant::now();
+    discord::GAME_STARTED.store(discord::now_secs(), Ordering::Relaxed);
     tokio::spawn(async move {
         let _hold = guard;
         let code = child.wait().await.ok().and_then(|s| s.code());
+        discord::GAME_STARTED.store(0, Ordering::Relaxed);
         stop_media.store(true, Ordering::Relaxed);
         if let Ok(mut inst) = Instance::load(&paths, &instance_id) {
             inst.playtime_secs += started.elapsed().as_secs();
@@ -671,6 +674,7 @@ async fn play(app: AppHandle, st: State<'_, AppState>) -> Res<()> {
 
 pub fn run() {
     let paths = Paths::new(Paths::default_root());
+    discord::spawn(paths.clone());
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

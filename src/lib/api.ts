@@ -31,6 +31,15 @@ export type Settings = {
   hold_my_items: boolean;
   voice_chat: boolean;
   performance_mods: boolean;
+  discord_rpc: boolean;
+  discord_app_id: string;
+  discord_details: string;
+  discord_state: string;
+  discord_image: string;
+  discord_button1: string;
+  discord_url1: string;
+  discord_button2: string;
+  discord_url2: string;
 };
 
 export type Loader = "vanilla" | "fabric" | "quilt" | "forge" | "neoforge";
