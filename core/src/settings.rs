@@ -109,7 +109,7 @@ impl Default for Settings {
             discord_app_id: String::new(),
             discord_details: "Yeban Client".into(),
             discord_state: "Build #3.0".into(),
-            discord_image: "https://raw.githubusercontent.com/masterrengoky-lab/bi4visual-launcher/novavis/assets/logo.png".into(),
+            discord_image: "https://raw.githubusercontent.com/masterrengoky-lab/bi4visual-launcher/novavis/assets/discord.jpg".into(),
             discord_button1: "Telegram".into(),
             discord_url1: String::new(),
             discord_button2: "Discord".into(),
