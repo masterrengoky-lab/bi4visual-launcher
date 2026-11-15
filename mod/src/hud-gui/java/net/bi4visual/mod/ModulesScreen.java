@@ -52,9 +52,6 @@ public class ModulesScreen extends Screen {
     /** A caption drawn inside the scrolling content (e.g. "Режим" over the mode chips). */
     private record Label(int x, int y, String text, int colour) {}
 
-    /** A module row's area on screen, for right-click binding. */
-    private record Hit(int x, int y, int w, int h, String id) {}
-
     private static Page page = Page.RENDER;
     private static String query = "";
     private static int scroll;
@@ -68,7 +65,6 @@ public class ModulesScreen extends Screen {
 
     private final List<AbstractWidget> content = new ArrayList<>();
     private final List<Label> labels = new ArrayList<>();
-    private final List<Hit> hits = new ArrayList<>();
     private EditBox search;
     private EditBox nameBox;
     private EditBox xBox, yBox, zBox;
@@ -131,7 +127,6 @@ public class ModulesScreen extends Screen {
         for (AbstractWidget w : content) removeWidget(w);
         content.clear();
         labels.clear();
-        hits.clear();
         nameBox = xBox = yBox = zBox = null;
         if (!query.isBlank() || page.category != null) {
             moduleColumns(shownModules(), cy, cy + ch);
@@ -164,6 +159,14 @@ public class ModulesScreen extends Screen {
     }
 
     private static final int ROW = 22;
+    private static final int BIND_W = 26;
+
+    /** One module row: the name/switch button and, to its right, a bind badge. */
+    private void moduleRow(Modules.Module m, int x, int y, int w) {
+        int mainW = w - BIND_W - 4;
+        add(new MenuButton(x, y, mainW, ROW - 4, m.name(), (g, b, hover) -> drawRow(g, b, m, hover), b -> onModule(m)));
+        add(new MenuButton(x + w - BIND_W, y, BIND_W, ROW - 4, m.id(), (g, b, hover) -> drawBind(g, b, m, hover), b -> capturing = m.id()));
+    }
 
     private int optionsHeight(Modules.Module m) {
         int rows = (m.options().length + 1) / 2;
@@ -195,10 +198,7 @@ public class ModulesScreen extends Screen {
         int y = top - scroll;
         for (Modules.Module m : col) {
             boolean rowVisible = y >= top - 1 && y + ROW <= bottom + 1;
-            if (rowVisible) {
-                add(new MenuButton(colX, y, colW, ROW - 4, m.name(), (g, b, hover) -> drawRow(g, b, m, hover), b -> onModule(m)));
-                hits.add(new Hit(colX, y, colW, ROW - 4, m.id()));
-            }
+            if (rowVisible) moduleRow(m, colX, y, colW);
             y += ROW;
             if (m.options() != null && m.id().equals(expanded)) {
                 String[] names = m.options();
@@ -283,8 +283,7 @@ public class ModulesScreen extends Screen {
             Modules.Module m = list.get(i);
             int x = cx + (i % 2) * (colW + 14);
             int y = top + (i / 2) * ROW;
-            add(new MenuButton(x, y, colW, ROW - 4, m.name(), (g, b, hover) -> drawRow(g, b, m, hover), b -> onModule(m)));
-            hits.add(new Hit(x, y, colW, ROW - 4, m.id()));
+            moduleRow(m, x, y, colW);
         }
         List<String> capes = new ArrayList<>();
         capes.add("");
@@ -540,7 +539,7 @@ public class ModulesScreen extends Screen {
             centred(g, "Ничего не нашлось", cy + ch / 2);
         }
         g.drawString(font, Fonts.small(capturing != null ? "Нажми клавишу для бинда · Esc — убрать"
-                : "ПКМ по модулю — бинд · колесо — листать · правый Shift закрыть"), cx, py + ph - 10, MUTED, false);
+                : "Значок справа — бинд · колесо — листать · правый Shift закрыть"), cx, py + ph - 10, MUTED, false);
         super.render(g, mouseX, mouseY, partial);
     }
 
@@ -552,20 +551,6 @@ public class ModulesScreen extends Screen {
         if (font.width(Fonts.hud(s)) <= max) return s;
         while (s.length() > 1 && font.width(Fonts.hud(s + "…")) > max) s = s.substring(0, s.length() - 1);
         return s + "…";
-    }
-
-    /** Right-click a module row to bind a key to it. */
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 1) {
-            for (Hit h : hits) {
-                if (mouseX >= h.x() && mouseX <= h.x() + h.w() && mouseY >= h.y() && mouseY <= h.y() + h.h()) {
-                    capturing = h.id();
-                    return true;
-                }
-            }
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     /** Wheel scrolling of the content (1.20.2+ signature; left without @Override on purpose). */
@@ -636,15 +621,21 @@ public class ModulesScreen extends Screen {
             String val = m.state().apply(Config.get());
             int vw = font.width(Fonts.small(val));
             g.drawString(font, Fonts.small(val), right - vw, y + (h - 7) / 2, accent, false);
-            right -= vw + 6;
         }
+    }
+
+    /** The bind badge to the right of a row: the key, or "+" when none is set. */
+    private static void drawBind(GuiGraphics g, Button b, Modules.Module m, boolean hover) {
+        boolean wait = m.id().equals(capturing);
         Integer bind = Config.get().binds.get(m.id());
-        if (bind != null) {
-            String k = Keys.name(bind).toLowerCase(Locale.ROOT);
-            int kw = font.width(Fonts.small(k)) + 6;
-            rounded(g, right - kw, y + (h - 11) / 2, kw, 11, 0xFF20242D);
-            g.drawString(font, Fonts.small(k), right - kw + 3, y + (h - 7) / 2, MUTED, false);
-        }
+        String label = wait ? "..." : bind != null ? Keys.name(bind).toLowerCase(Locale.ROOT) : "+";
+        rounded(g, b.getX(), b.getY(), b.getWidth(), b.getHeight(), wait ? Config.accent() : hover ? 0xFF2A303B : 0xFF1B1F27);
+        Font font = font();
+        String show = label;
+        while (show.length() > 1 && font.width(Fonts.small(show)) > b.getWidth() - 4) show = show.substring(0, show.length() - 1);
+        int tw = font.width(Fonts.small(show));
+        g.drawString(font, Fonts.small(show), b.getX() + (b.getWidth() - tw) / 2, b.getY() + (b.getHeight() - 7) / 2,
+                wait ? 0xFFFFFFFF : bind != null ? DIM : MUTED, false);
     }
 
     private static void drawChip(GuiGraphics g, Button b, boolean selected, boolean hover) {
