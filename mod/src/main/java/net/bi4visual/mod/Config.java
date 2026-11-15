@@ -50,6 +50,7 @@ public final class Config {
         /** ItemPhysic: dropped items lie flat and still. BlockOverlay: the aimed block is filled with the theme colour. */
         public boolean itemPhysic = false;
         public boolean blockOverlay = false;
+        public boolean itemHighlight = false;
         /** NoRender: no camera shake when hurt. AspectRatio: stretch the picture like a 4:3 screen. */
         public boolean noHurtShake = false;
         public String aspect = "off";

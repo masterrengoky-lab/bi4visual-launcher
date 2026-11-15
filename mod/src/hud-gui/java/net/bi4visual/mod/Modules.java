@@ -112,6 +112,7 @@ public final class Modules {
             onOff("hitWave", "HitWave", "Волна вокруг цели при ударе", Category.RENDER, d -> d.hitWave, (d, v) -> d.hitWave = v),
             onOff("damageNumbers", "DamageParticles", "Сколько урона ты нанёс, цифрами над целью", Category.RENDER, d -> d.damageNumbers, (d, v) -> d.damageNumbers = v),
             onOff("deathEffect", "DeathEffect", "Вспышка, когда твоя цель умирает", Category.RENDER, d -> d.deathEffect, (d, v) -> d.deathEffect = v),
+            onOff("itemHighlight", "ItemHighlighter", "Искорка над выпавшими предметами рядом (не сквозь стены)", Category.RENDER, d -> d.itemHighlight, (d, v) -> d.itemHighlight = v),
             onOff("jumpCircles", "JumpCircle", "Круги на земле, где ты прыгнул", Category.RENDER, d -> d.jumpCircles, (d, v) -> d.jumpCircles = v),
             onOff("trails", "Trails", "След за тобой (стиль ниже, виден в F5)", Category.RENDER, d -> d.trails, (d, v) -> d.trails = v),
             cycle("trailStyle", "Trails: стиль", "Радуга, лента цвета темы, Glass Vapor или мягкие точки", Category.RENDER, d -> d.trailStyle, (d, v) -> d.trailStyle = v,
@@ -269,6 +270,30 @@ public final class Modules {
             }
         } else {
             lastSnow = now;
+        }
+
+        itemHighlight(mc, player, now);
+    }
+
+    private static long lastItemGlow;
+
+    /**
+     * ItemHighlighter: a soft spark hovers over dropped items near the player.
+     * It is a world particle, so a wall in front hides it — nothing is shown
+     * through blocks, only what the player can already see is marked.
+     */
+    private static void itemHighlight(Minecraft mc, Player player, long now) {
+        if (!Config.get().itemHighlight || mc.isPaused() || now - lastItemGlow < 180) return;
+        lastItemGlow = now;
+        double reach = 16;
+        int shown = 0;
+        for (net.minecraft.world.entity.Entity e : mc.level.entitiesForRendering()) {
+            if (!(e instanceof net.minecraft.world.entity.item.ItemEntity item)) continue;
+            if (item.distanceToSqr(player) > reach * reach) continue;
+            mc.level.addParticle(net.minecraft.core.particles.ParticleTypes.END_ROD,
+                    item.getX(), item.getY() + item.getBbHeight() + 0.25, item.getZ(),
+                    0, 0.01, 0);
+            if (++shown >= 40) break;
         }
     }
 
