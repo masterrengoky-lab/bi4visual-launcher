@@ -26,12 +26,18 @@ public final class Modules {
         }
     }
 
-    /** One module: its state as text ("вкл", "выкл" or a value) and what a click does. */
+    /**
+     * One module: its state as text ("вкл", "выкл" or a value) and what a click
+     * does. A module with several modes also carries {@code options} (the mode
+     * names), {@code optionIndex} (which one is chosen) and {@code optionPick}
+     * (choose one by index), so the menu can show the modes as chips.
+     */
     public record Module(String id, String name, String hint, Category category,
-                         Function<Config.Data, String> state, Consumer<Config.Data> click) {
+                         Function<Config.Data, String> state, Consumer<Config.Data> click,
+                         String[] options, java.util.function.ToIntFunction<Config.Data> optionIndex,
+                         java.util.function.ObjIntConsumer<Config.Data> optionPick) {
         public boolean toggle() {
-            String s = state.apply(Config.get());
-            return s.equals("вкл") || s.equals("выкл");
+            return options == null;
         }
 
         public boolean on() {
@@ -48,24 +54,24 @@ public final class Modules {
     }
 
     private static Module onOff(String id, String name, String hint, Category c, Getter get, Setter set) {
-        return new Module(id, name, hint, c, d -> get.get(d) ? "вкл" : "выкл", d -> set.set(d, !get.get(d)));
+        return new Module(id, name, hint, c, d -> get.get(d) ? "вкл" : "выкл", d -> set.set(d, !get.get(d)),
+                null, null, null);
     }
 
     private static Module cycle(String id, String name, String hint, Category c,
                                 Function<Config.Data, String> get, java.util.function.BiConsumer<Config.Data, String> set,
                                 String[] values, String[] names) {
-        return new Module(id, name, hint, c, d -> {
+        java.util.function.ToIntFunction<Config.Data> index = d -> {
             String v = get.apply(d);
             for (int i = 0; i < values.length; i++) {
-                if (values[i].equals(v)) return names[i];
+                if (values[i].equals(v)) return i;
             }
-            return names[0];
-        }, d -> {
-            String v = get.apply(d);
-            int i = 0;
-            while (i < values.length && !values[i].equals(v)) i++;
-            set.accept(d, values[(i + 1) % values.length]);
-        });
+            return 0;
+        };
+        return new Module(id, name, hint, c,
+                d -> names[index.applyAsInt(d)],
+                d -> set.accept(d, values[(index.applyAsInt(d) + 1) % values.length]),
+                names, index, (d, i) -> set.accept(d, values[Math.floorMod(i, values.length)]));
     }
 
     public static final List<Module> ALL = List.of(

@@ -17,46 +17,58 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * The visuals menu on Right Shift: a glassy panel with sections on the left
- * (Render, Interface, Utility, Themes, Waypoints, Configs), a search box on
- * top and module cards in two columns, each with a bind and a switch.
+ * The visuals menu on Right Shift, drawn like a modern client: a dark rounded
+ * panel with a "Miki" logo and a grouped sidebar on the left, a big section
+ * title and a search box on top, and the modules as flat rows in two columns.
+ * A module with modes (a cycle) opens inline to show its modes as chips.
+ * Right-click a row to bind a key to it.
  */
 public class ModulesScreen extends Screen {
     private static final int TEXT = 0xFFF1F3F8;
     private static final int MUTED = 0xFF7B8190;
+    private static final int DIM = 0xFF9AA0AD;
     private static final int CARD = 0xC0181B22;
     private static final int CARD_HOVER = 0xD0202430;
+    private static final int SIDE = 112;
 
     private enum Page {
-        RENDER("Render", "◈", Modules.Category.RENDER),
-        INTERFACE("Interface", "▣", Modules.Category.INTERFACE),
-        UTILITY("Utility", "✱", Modules.Category.UTILITY),
-        COSMETICS("Cosmetics", "⚔", null),
-        THEMES("Themes", "✎", null),
-        WAYPOINTS("Waypoints", "◎", null),
-        CONFIGS("Configs", "⟳", null);
+        RENDER("Визуалы", Modules.Category.RENDER),
+        INTERFACE("Интерфейс", Modules.Category.INTERFACE),
+        UTILITY("Разное", Modules.Category.UTILITY),
+        COSMETICS("Косметика", null),
+        THEMES("Темы", null),
+        CONFIGS("Профили", null),
+        WAYPOINTS("Метки", null);
 
         final String title;
-        final String icon;
         final Modules.Category category;
 
-        Page(String title, String icon, Modules.Category category) {
+        Page(String title, Modules.Category category) {
             this.title = title;
-            this.icon = icon;
             this.category = category;
         }
     }
+
+    /** A caption drawn inside the scrolling content (e.g. "Режим" over the mode chips). */
+    private record Label(int x, int y, String text, int colour) {}
+
+    /** A module row's area on screen, for right-click binding. */
+    private record Hit(int x, int y, int w, int h, String id) {}
 
     private static Page page = Page.RENDER;
     private static String query = "";
     private static int scroll;
     private static String capturing;
+    /** The open mode module, or "" — only one row shows its chips at a time. */
+    private static String expanded = "";
     /** Which part of the Cosmetics section is open: model, swords or world. */
     private static String cosTab = "swords";
     /** Which sword kind the swords grid picks a model for; "" is all swords. */
     private static String swordKind = "";
 
     private final List<AbstractWidget> content = new ArrayList<>();
+    private final List<Label> labels = new ArrayList<>();
+    private final List<Hit> hits = new ArrayList<>();
     private EditBox search;
     private EditBox nameBox;
     private EditBox xBox, yBox, zBox;
@@ -73,39 +85,41 @@ public class ModulesScreen extends Screen {
 
     @Override
     protected void init() {
-        pw = Math.min(430, width - 16);
-        ph = Math.min(250, height - 16);
+        pw = Math.min(470, width - 16);
+        ph = Math.min(276, height - 16);
         px = (width - pw) / 2;
         py = (height - ph) / 2;
-        cx = px + 100;
-        cy = py + 28;
-        cw = pw - 100 - 8;
-        ch = ph - 28 - 8;
+        cx = px + SIDE + 12;
+        cy = py + 44;
+        cw = px + pw - 12 - cx;
+        ch = py + ph - 14 - cy;
 
-        int y = py + 30;
-        String[] groups = {"Visual", null, "Other", "Client", null, null, null};
+        int y = py + 44;
+        String[] groups = {"Main", null, null, "Other", null, null, null};
         Page[] pages = Page.values();
         for (int i = 0; i < pages.length; i++) {
-            if (groups[i] != null) y += 10;
+            if (groups[i] != null) y += 13;
             Page p = pages[i];
-            addRenderableWidget(new MenuButton(px + 6, y, 86, 15, p.icon + "  " + p.title,
+            addRenderableWidget(new MenuButton(px + 8, y, SIDE - 16, 17, p.title,
                     (g, b, hover) -> drawSection(g, b, p == page && query.isEmpty(), hover), b -> {
                         page = p;
                         scroll = 0;
                         query = "";
+                        expanded = "";
                         if (search != null) search.setValue("");
                         rebuildContent();
                     }));
-            y += 16;
+            y += 19;
         }
 
-        search = new EditBox(font, px + pw - 108, py + 8, 100, 13, Component.literal("Search"));
-        search.setHint(Component.literal("Search"));
+        search = new EditBox(font, cx + cw - 150, py + 16, 150, 14, Component.literal("Поиск модулей"));
+        search.setHint(Component.literal("Поиск модулей"));
         search.setValue(query);
         search.setResponder(text -> {
             if (!text.equals(query)) {
                 query = text;
                 scroll = 0;
+                expanded = "";
                 rebuildContent();
             }
         });
@@ -116,9 +130,11 @@ public class ModulesScreen extends Screen {
     private void rebuildContent() {
         for (AbstractWidget w : content) removeWidget(w);
         content.clear();
+        labels.clear();
+        hits.clear();
         nameBox = xBox = yBox = zBox = null;
         if (!query.isBlank() || page.category != null) {
-            modules();
+            moduleColumns(shownModules(), cy, cy + ch);
         } else if (page == Page.COSMETICS) {
             cosmetics();
         } else if (page == Page.THEMES) {
@@ -135,7 +151,7 @@ public class ModulesScreen extends Screen {
         return addRenderableWidget(w);
     }
 
-    // ---------- pages ----------
+    // ---------- modules (flat rows, two columns, expandable modes) ----------
 
     private List<Modules.Module> shownModules() {
         if (query.isBlank()) return Modules.in(page.category);
@@ -147,31 +163,79 @@ public class ModulesScreen extends Screen {
         return out;
     }
 
-    private void modules() {
-        modules(shownModules(), cy, ch);
+    private static final int ROW = 22;
+
+    private int optionsHeight(Modules.Module m) {
+        int rows = (m.options().length + 1) / 2;
+        return 14 + rows * 16 + 4;
     }
 
-    private void modules(List<Modules.Module> list, int cy, int ch) {
-        int colW = (cw - 6) / 2;
-        int rowH = 32;
-        int rows = (list.size() + 1) / 2;
-        int visible = Math.max(1, ch / rowH);
-        scroll = Math.max(0, Math.min(scroll, rows - visible));
-        for (int i = 0; i < list.size(); i++) {
-            int row = i / 2 - scroll;
-            if (row < 0 || row >= visible) continue;
-            Modules.Module m = list.get(i);
-            int x = cx + (i % 2) * (colW + 6);
-            int y = cy + row * rowH;
-            // The bind chip goes first, so it gets the click before the card under it.
-            int chipW = 30;
-            int chipX = x + colW - 26 - chipW - 4;
-            add(new MenuButton(chipX, y + 6, chipW, 11, "bind", (g, b, hover) -> drawChip(g, b, m, hover), b -> {
-                capturing = m.id();
-            }));
-            add(new MenuButton(x, y, colW, rowH - 4, m.name(), (g, b, hover) -> drawCard(g, b, m, hover), b -> Modules.click(m)));
+    private int rowHeight(Modules.Module m) {
+        int h = ROW;
+        if (m.options() != null && m.id().equals(expanded)) h += optionsHeight(m);
+        return h;
+    }
+
+    private void moduleColumns(List<Modules.Module> list, int top, int bottom) {
+        int colGap = 14;
+        int colW = (cw - colGap) / 2;
+        List<Modules.Module> left = new ArrayList<>();
+        List<Modules.Module> right = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) (i % 2 == 0 ? left : right).add(list.get(i));
+        int hL = 0, hR = 0;
+        for (Modules.Module m : left) hL += rowHeight(m);
+        for (Modules.Module m : right) hR += rowHeight(m);
+        int maxScroll = Math.max(0, Math.max(hL, hR) - (bottom - top));
+        scroll = Math.max(0, Math.min(scroll, maxScroll));
+        column(left, cx, colW, top, bottom);
+        column(right, cx + colW + colGap, colW, top, bottom);
+    }
+
+    private void column(List<Modules.Module> col, int colX, int colW, int top, int bottom) {
+        int y = top - scroll;
+        for (Modules.Module m : col) {
+            boolean rowVisible = y >= top - 1 && y + ROW <= bottom + 1;
+            if (rowVisible) {
+                add(new MenuButton(colX, y, colW, ROW - 4, m.name(), (g, b, hover) -> drawRow(g, b, m, hover), b -> onModule(m)));
+                hits.add(new Hit(colX, y, colW, ROW - 4, m.id()));
+            }
+            y += ROW;
+            if (m.options() != null && m.id().equals(expanded)) {
+                String[] names = m.options();
+                int chipGap = 5;
+                int chipW = (colW - chipGap) / 2;
+                int labelY = y - 2;
+                if (labelY >= top && labelY < bottom) labels.add(new Label(colX, labelY, "Режим", MUTED));
+                int cy0 = y + 11;
+                int cur = m.optionIndex().applyAsInt(Config.get());
+                for (int i = 0; i < names.length; i++) {
+                    int bx = colX + (i % 2) * (chipW + chipGap);
+                    int by = cy0 + (i / 2) * 16;
+                    if (by < top || by + 13 > bottom) continue;
+                    final int idx = i;
+                    final boolean sel = i == cur;
+                    add(new MenuButton(bx, by, chipW, 13, names[i], (g, b, hover) -> drawChip(g, b, sel, hover), b -> {
+                        Config.Data d = Config.get();
+                        m.optionPick().accept(d, idx);
+                        Config.save(d);
+                        Hud.notify(m.name(), names[idx]);
+                    }));
+                }
+                y += optionsHeight(m);
+            }
         }
     }
+
+    private void onModule(Modules.Module m) {
+        if (m.toggle()) {
+            Modules.click(m);
+        } else {
+            expanded = m.id().equals(expanded) ? "" : m.id();
+            rebuildContent();
+        }
+    }
+
+    // ---------- other pages ----------
 
     private void themes() {
         int cols = 3;
@@ -179,7 +243,7 @@ public class ModulesScreen extends Screen {
         int h = 30;
         for (int i = 0; i < Config.THEMES.size(); i++) {
             Config.Theme t = Config.THEMES.get(i);
-            int row = i / cols - scroll;
+            int row = i / cols - scroll / 36;
             if (row < 0 || (row + 1) * (h + 6) > ch) continue;
             int x = cx + (i % cols) * (w + 6);
             int y = cy + row * (h + 6);
@@ -197,34 +261,41 @@ public class ModulesScreen extends Screen {
         int x = cx;
         for (String[] tab : tabs) {
             int w = font.width(Fonts.small(tab[1])) + 14;
-            add(new MenuButton(x, cy, w, 13, tab[1], (g, b, hover) -> drawTab(g, b, tab[1], tab[0].equals(cosTab), hover), b -> {
+            add(new MenuButton(x, cy, w, 14, tab[1], (g, b, hover) -> drawTab(g, b, tab[1], tab[0].equals(cosTab), hover), b -> {
                 cosTab = tab[0];
                 scroll = 0;
+                expanded = "";
                 rebuildContent();
             }));
             x += w + 4;
         }
-        if (cosTab.equals("model")) modules(Modules.in(Modules.Category.MODEL), cy + 19, ch - 19);
-        else if (cosTab.equals("world")) world(cy + 19, ch - 19);
-        else swords(cy + 19, ch - 19);
+        if (cosTab.equals("model")) moduleColumns(Modules.in(Modules.Category.MODEL), cy + 20, cy + ch);
+        else if (cosTab.equals("world")) world(cy + 20, ch - 20);
+        else swords(cy + 20, ch - 20);
     }
 
-    /** Cosmetics tab: halo, aura and orbit cards on top, capes from the pack below. */
-    private void world(int cy, int ch) {
+    /** Cosmetics tab: halo, aura and orbit as fixed rows, then capes from the pack. */
+    private void world(int top, int height) {
         List<Modules.Module> list = Modules.in(Modules.Category.WORLD);
-        int rowH = 32;
-        int top = ((list.size() + 1) / 2) * rowH;
-        modules(list, cy, top);
+        int colW = (cw - 14) / 2;
+        int rows = (list.size() + 1) / 2;
+        for (int i = 0; i < list.size(); i++) {
+            Modules.Module m = list.get(i);
+            int x = cx + (i % 2) * (colW + 14);
+            int y = top + (i / 2) * ROW;
+            add(new MenuButton(x, y, colW, ROW - 4, m.name(), (g, b, hover) -> drawRow(g, b, m, hover), b -> onModule(m)));
+            hits.add(new Hit(x, y, colW, ROW - 4, m.id()));
+        }
         List<String> capes = new ArrayList<>();
         capes.add("");
         capes.addAll(Cosmetics.capes());
         if (capes.size() == 1) return;
         int cols = 4;
         int w = (cw - (cols - 1) * 5) / cols;
-        int y0 = cy + top + 2;
+        int y0 = top + rows * ROW + 4;
         for (int i = 0; i < capes.size(); i++) {
             int y = y0 + (i / cols) * 20;
-            if (y + 16 > cy + ch) break;
+            if (y + 16 > top + height) break;
             String name = capes.get(i);
             add(new MenuButton(cx + (i % cols) * (w + 5), y, w, 16, name, (g, b, hover) -> drawTab(g, b,
                     name.isEmpty() ? "Без плаща" : "Плащ " + name, name.equals(Config.get().cape), hover), b -> {
@@ -236,36 +307,36 @@ public class ModulesScreen extends Screen {
         }
     }
 
-    private void swords(int cy, int ch) {
+    private void swords(int top, int height) {
         List<String> names = new ArrayList<>();
         names.add("");
         names.addAll(Cosmetics.names());
         if (names.size() == 1) return;
-        // Which sword the pick is for: all of them, or one kind.
         int kx = cx;
         for (String[] kind : Cosmetics.SWORDS) {
             int kw = font.width(Fonts.small(kind[1])) + 10;
-            add(new MenuButton(kx, cy, kw, 12, kind[1], (g, b, hover) -> drawTab(g, b, kind[1], kind[0].equals(swordKind), hover), b -> {
+            add(new MenuButton(kx, top, kw, 12, kind[1], (g, b, hover) -> drawTab(g, b, kind[1], kind[0].equals(swordKind), hover), b -> {
                 swordKind = kind[0];
                 rebuildContent();
             }));
             kx += kw + 3;
         }
-        cy += 17;
-        ch -= 17;
+        top += 17;
+        height -= 17;
         int cols = 5;
         int w = (cw - (cols - 1) * 5) / cols;
         int h = 40;
-        int visible = Math.max(1, ch / (h + 5));
+        int visible = Math.max(1, height / (h + 5));
         int rows = (names.size() + cols - 1) / cols;
-        scroll = Math.max(0, Math.min(scroll, rows - visible));
+        int srow = scroll / (h + 5);
+        srow = Math.max(0, Math.min(srow, Math.max(0, rows - visible)));
         String kind = swordKind;
         for (int i = 0; i < names.size(); i++) {
-            int row = i / cols - scroll;
+            int row = i / cols - srow;
             if (row < 0 || row >= visible) continue;
             String name = names.get(i);
             int x = cx + (i % cols) * (w + 5);
-            int y = cy + row * (h + 5);
+            int y = top + row * (h + 5);
             add(new MenuButton(x, y, w, h, name, (g, b, hover) -> drawCosmetic(g, b, name, kind, hover), b -> {
                 Config.Data d = Config.get();
                 if (kind.isEmpty()) d.cosmetic = name;
@@ -301,9 +372,9 @@ public class ModulesScreen extends Screen {
         List<Config.Waypoint> list = Config.get().waypoints;
         int rowH = 22;
         int visible = Math.max(1, (ch - 22) / rowH);
-        scroll = Math.max(0, Math.min(scroll, list.size() - visible));
+        int srow = Math.max(0, Math.min(scroll / rowH, Math.max(0, list.size() - visible)));
         for (int i = 0; i < list.size(); i++) {
-            int row = i - scroll;
+            int row = i - srow;
             if (row < 0 || row >= visible) continue;
             Config.Waypoint w = list.get(i);
             int y = cy + 22 + row * rowH;
@@ -313,7 +384,7 @@ public class ModulesScreen extends Screen {
                 Config.save(d);
                 rebuildContent();
             }));
-            add(new MenuButton(cx, y, cw, rowH - 2, w.name, (g, b, hover) -> drawRow(g, b, w.name,
+            add(new MenuButton(cx, y, cw, rowH - 2, w.name, (g, b, hover) -> drawInfoRow(g, b, w.name,
                     w.x + " " + w.y + " " + w.z + "  ·  " + shortDim(w.dim), hover), b -> {}));
         }
     }
@@ -343,28 +414,28 @@ public class ModulesScreen extends Screen {
     }
 
     private void configs() {
-        nameBox = add(new EditBox(font, cx, cy, cw - 70, 14, Component.literal("Название конфига")));
-        nameBox.setHint(Component.literal("Название конфига"));
+        nameBox = add(new EditBox(font, cx, cy, cw - 70, 14, Component.literal("Название профиля")));
+        nameBox.setHint(Component.literal("Название профиля"));
         add(new MenuButton(cx + cw - 64, cy, 64, 14, "Сохранить", (g, b, hover) -> drawSmall(g, b, "Сохранить", true, hover), b -> {
             String name = nameBox.getValue().trim().replaceAll("[^\\p{L}\\p{N} _-]", "");
             if (name.isEmpty()) {
-                Hud.notify("Конфиги", "введи название");
+                Hud.notify("Профили", "введи название");
                 return;
             }
             try {
                 Config.saveAs(name);
                 Hud.notify(name, "сохранён");
             } catch (Exception e) {
-                Hud.notify("Конфиги", "не удалось сохранить");
+                Hud.notify("Профили", "не удалось сохранить");
             }
             rebuildContent();
         }));
         List<String> names = configNames();
         int rowH = 22;
         int visible = Math.max(1, (ch - 22) / rowH);
-        scroll = Math.max(0, Math.min(scroll, names.size() - visible));
+        int srow = Math.max(0, Math.min(scroll / rowH, Math.max(0, names.size() - visible)));
         for (int i = 0; i < names.size(); i++) {
-            int row = i - scroll;
+            int row = i - srow;
             if (row < 0 || row >= visible) continue;
             String name = names.get(i);
             int y = cy + 22 + row * rowH;
@@ -381,10 +452,10 @@ public class ModulesScreen extends Screen {
                     Config.load(name);
                     Hud.notify(name, "загружен");
                 } catch (Exception e) {
-                    Hud.notify("Конфиги", "не удалось загрузить");
+                    Hud.notify("Профили", "не удалось загрузить");
                 }
             }));
-            add(new MenuButton(cx, y, cw, rowH - 2, name, (g, b, hover) -> drawRow(g, b, name, "конфиг", hover), b -> {}));
+            add(new MenuButton(cx, y, cw, rowH - 2, name, (g, b, hover) -> drawInfoRow(g, b, name, "профиль", hover), b -> {}));
         }
     }
 
@@ -415,35 +486,45 @@ public class ModulesScreen extends Screen {
                 capturing = null;
             }
         }
-        if (minecraft.level != null) g.fill(0, 0, width, height, 0x55000000);
+        if (minecraft.level != null) g.fill(0, 0, width, height, 0x66000000);
         int accent = Config.accent();
-        rounded(g, px, py, pw, ph, 0xE60E1015);
-        rounded(g, px + 1, py + 1, 92, ph - 2, 0x60181B22);
+        rounded(g, px, py, pw, ph, 0xF00C0E13);
+        rounded(g, px + 1, py + 1, SIDE, ph - 2, 0x66141821);
+        g.fill(px + SIDE + 1, py + 8, px + SIDE + 2, py + ph - 8, 0x33FFFFFF);
 
-        // Sidebar: title, groups and the profile card at the bottom.
-        g.drawString(font, Fonts.hud(Brand.NAME), px + 10, py + 10, TEXT, false);
-        g.drawString(font, Fonts.small(Brand.VERSION), px + 12 + font.width(Fonts.hud(Brand.NAME)), py + 11, accent, false);
-        int y = py + 30;
-        String[] groups = {"Visual", null, "Other", "Client", null, null, null};
+        // Sidebar: logo, group captions, the profile card at the bottom.
+        rounded(g, px + 10, py + 10, 22, 22, accent);
+        rounded(g, px + 11, py + 11, 20, 20, 0xFF14171F);
+        String logo = Brand.MENU_LOGO;
+        g.drawString(font, Fonts.hud(logo), px + 21 - font.width(Fonts.hud(logo)) / 2, py + 17, TEXT, false);
+        g.drawString(font, Fonts.small(Brand.NAME), px + 38, py + 16, TEXT, false);
+        g.drawString(font, Fonts.small("v" + Brand.VERSION), px + 38, py + 25, MUTED, false);
+
+        int y = py + 44;
+        String[] groups = {"Main", null, null, "Other", null, null, null};
         for (int i = 0; i < groups.length; i++) {
             if (groups[i] != null) {
-                g.drawString(font, Fonts.small(groups[i]), px + 10, y + 1, MUTED, false);
-                y += 10;
+                g.drawString(font, Fonts.small(groups[i].toUpperCase(Locale.ROOT)), px + 10, y + 3, 0xFF5A6070, false);
+                y += 13;
             }
-            y += 16;
+            y += 19;
         }
         String nick = minecraft.player != null ? minecraft.player.getName().getString() : minecraft.getUser().getName();
-        rounded(g, px + 6, py + ph - 30, 86, 24, 0xFF161A21);
-        rounded(g, px + 10, py + ph - 26, 16, 16, accent);
-        g.drawString(font, Fonts.hud(nick.substring(0, 1).toUpperCase()), px + 15, py + ph - 22, 0xFFFFFFFF, false);
-        g.drawString(font, Fonts.hud(cut(nick, 58)), px + 30, py + ph - 27 + 3, TEXT, false);
-        g.drawString(font, Fonts.small("Free"), px + 30, py + ph - 17 + 2, MUTED, false);
+        rounded(g, px + 6, py + ph - 32, SIDE - 10, 26, 0xFF161A21);
+        rounded(g, px + 10, py + ph - 28, 18, 18, accent);
+        g.drawString(font, Fonts.hud(nick.substring(0, 1).toUpperCase(Locale.ROOT)), px + 16, py + ph - 24, 0xFFFFFFFF, false);
+        g.drawString(font, Fonts.hud(cut(nick, 64)), px + 32, py + ph - 27, TEXT, false);
+        g.drawString(font, Fonts.small("Сборка: " + Brand.VERSION), px + 32, py + ph - 17, MUTED, false);
 
-        // Top bar of the content.
-        String where = query.isBlank() ? page.title : "Поиск";
-        g.drawString(font, Fonts.hud("Activity view"), cx, py + 11, TEXT, false);
-        int ax = cx + font.width(Fonts.hud("Activity view  "));
-        g.drawString(font, Fonts.hud((query.isBlank() ? page.icon : "⌕") + " " + where), ax, py + 11, accent, false);
+        // Content header: big title and a line under it.
+        String title = query.isBlank() ? page.title : "Поиск";
+        g.drawString(font, Fonts.title(title), cx, py + 14, TEXT, false);
+        g.fill(cx, py + 36, px + pw - 12, py + 37, 0x22FFFFFF);
+
+        // Captions inside the content (e.g. "Режим"), clipped to the list area.
+        g.enableScissor(cx, cy - 2, px + pw - 10, py + ph - 10);
+        for (Label l : labels) g.drawString(font, Fonts.small(l.text()), l.x(), l.y(), l.colour(), false);
+        g.disableScissor();
 
         if (page == Page.COSMETICS && query.isBlank() && cosTab.equals("swords") && Cosmetics.names().isEmpty()) {
             centred(g, "Косметики нет: импортируй zip в лаунчере", cy + ch / 2 - 6);
@@ -453,13 +534,13 @@ public class ModulesScreen extends Screen {
             centred(g, "Точек пока нет", cy + ch / 2);
         }
         if (page == Page.CONFIGS && query.isBlank() && configNames().isEmpty()) {
-            centred(g, "Конфигов пока нет", cy + ch / 2);
+            centred(g, "Профилей пока нет", cy + ch / 2);
         }
-        if (query.isBlank() ? false : shownModules().isEmpty()) {
+        if (!query.isBlank() && shownModules().isEmpty()) {
             centred(g, "Ничего не нашлось", cy + ch / 2);
         }
         g.drawString(font, Fonts.small(capturing != null ? "Нажми клавишу для бинда · Esc — убрать"
-                : "Правый Shift или Esc — закрыть · колесо — листать"), cx, py + ph - 10, MUTED, false);
+                : "ПКМ по модулю — бинд · колесо — листать · правый Shift закрыть"), cx, py + ph - 10, MUTED, false);
         super.render(g, mouseX, mouseY, partial);
     }
 
@@ -473,10 +554,24 @@ public class ModulesScreen extends Screen {
         return s + "…";
     }
 
-    /** Wheel scrolling of the module list (1.20.2+ signature; left without @Override on purpose). */
+    /** Right-click a module row to bind a key to it. */
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 1) {
+            for (Hit h : hits) {
+                if (mouseX >= h.x() && mouseX <= h.x() + h.w() && mouseY >= h.y() && mouseY <= h.y() + h.h()) {
+                    capturing = h.id();
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /** Wheel scrolling of the content (1.20.2+ signature; left without @Override on purpose). */
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (scrollY != 0) {
-            scroll = Math.max(0, scroll + (scrollY < 0 ? 1 : -1));
+            scroll = Math.max(0, scroll + (scrollY < 0 ? 20 : -20));
             rebuildContent();
             return true;
         }
@@ -512,43 +607,52 @@ public class ModulesScreen extends Screen {
     }
 
     private static void drawSection(GuiGraphics g, Button b, boolean active, boolean hover) {
-        if (active || hover) rounded(g, b.getX(), b.getY(), b.getWidth(), b.getHeight(), active ? 0xFF1C212B : 0xFF161A21);
+        if (active || hover) rounded(g, b.getX(), b.getY(), b.getWidth(), b.getHeight(), active ? 0xFF1D222D : 0xFF161A21);
         if (active) g.fill(b.getX(), b.getY() + 4, b.getX() + 2, b.getY() + b.getHeight() - 4, Config.accent());
-        g.drawString(font(), Fonts.hud(b.getMessage().getString()), b.getX() + 8, b.getY() + 4, active ? TEXT : 0xFF8E95A6, false);
+        g.drawString(font(), Fonts.hud(b.getMessage().getString()), b.getX() + 9, b.getY() + 5, active ? TEXT : 0xFF8E95A6, false);
     }
 
-    private static void drawCard(GuiGraphics g, Button b, Modules.Module m, boolean hover) {
+    /** One module as a flat row: name on the left, a switch or a mode value on the right. */
+    private static void drawRow(GuiGraphics g, Button b, Modules.Module m, boolean hover) {
         int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
         int accent = Config.accent();
-        rounded(g, x, y, w, h, hover ? CARD_HOVER : CARD);
+        if (hover) rounded(g, x - 2, y - 1, w + 4, h + 2, 0x33222A38);
         Font font = font();
         boolean on = m.on();
-        g.fill(x + 6, y + 8, x + 8, y + 12, on ? accent : 0xFF3A404C);
-        g.drawString(font, Fonts.hud(m.name()), x + 12, y + 5, on ? TEXT : 0xFFB4BAC6, false);
-        String hint = m.hint();
-        int max = w - 18 - 66;
-        while (hint.length() > 3 && font.width(Fonts.small(hint)) > max) hint = hint.substring(0, hint.length() - 2);
-        if (!hint.equals(m.hint())) hint = hint.trim() + "…";
-        g.drawString(font, Fonts.small(hint), x + 12, y + 17, MUTED, false);
+        g.drawString(font, Fonts.hud(m.name()), x + 2, y + (h - 7) / 2, on ? TEXT : DIM, false);
+        int right = x + w;
         if (m.toggle()) {
-            int sx = x + w - 24, sy = y + 8;
-            rounded(g, sx, sy, 18, 10, on ? accent : 0xFF2A303B);
-            int kx = on ? sx + 10 : sx + 2;
-            g.fill(kx, sy + 2, kx + 6, sy + 8, 0xFFFFFFFF);
+            int sw = 22, sh = 12, sx = right - sw, sy = y + (h - sh) / 2;
+            rounded(g, sx, sy, sw, sh, on ? accent : 0xFF2A303B);
+            int kx = on ? sx + sw - 9 : sx + 2;
+            rounded(g, kx, sy + 2, 7, 8, 0xFFFFFFFF);
+            right = sx - 6;
         } else {
-            String state = m.state().apply(Config.get());
-            int tw = font.width(Fonts.small(state));
-            g.drawString(font, Fonts.small(state), x + w - 6 - tw, y + 9, on ? accent : MUTED, false);
+            boolean exp = m.id().equals(expanded);
+            int mx = right - 8, my = y + h / 2;
+            g.fill(mx, my - 1, mx + 8, my + 1, MUTED);
+            if (!exp) g.fill(mx + 3, my - 4, mx + 5, my + 4, MUTED);
+            right -= 14;
+            String val = m.state().apply(Config.get());
+            int vw = font.width(Fonts.small(val));
+            g.drawString(font, Fonts.small(val), right - vw, y + (h - 7) / 2, accent, false);
+            right -= vw + 6;
+        }
+        Integer bind = Config.get().binds.get(m.id());
+        if (bind != null) {
+            String k = Keys.name(bind).toLowerCase(Locale.ROOT);
+            int kw = font.width(Fonts.small(k)) + 6;
+            rounded(g, right - kw, y + (h - 11) / 2, kw, 11, 0xFF20242D);
+            g.drawString(font, Fonts.small(k), right - kw + 3, y + (h - 7) / 2, MUTED, false);
         }
     }
 
-    private static void drawChip(GuiGraphics g, Button b, Modules.Module m, boolean hover) {
-        boolean wait = m.id().equals(capturing);
-        String label = wait ? "..." : Keys.name(Config.get().binds.get(m.id())).toLowerCase(Locale.ROOT);
-        rounded(g, b.getX(), b.getY(), b.getWidth(), b.getHeight(), wait ? Config.accent() : hover ? 0xFF2A303B : 0xFF20242D);
+    private static void drawChip(GuiGraphics g, Button b, boolean selected, boolean hover) {
+        rounded(g, b.getX(), b.getY(), b.getWidth(), b.getHeight(), selected ? Config.accent() : hover ? CARD_HOVER : CARD);
         Font font = font();
-        int tw = font.width(Fonts.small(label));
-        g.drawString(font, Fonts.small(label), b.getX() + (b.getWidth() - tw) / 2, b.getY() + 2, wait ? 0xFFFFFFFF : MUTED, false);
+        int tw = font.width(Fonts.small(b.getMessage().getString()));
+        g.drawString(font, Fonts.small(b.getMessage().getString()), b.getX() + (b.getWidth() - tw) / 2, b.getY() + 3,
+                selected ? 0xFFFFFFFF : 0xFFB4BAC6, false);
     }
 
     private static void drawTheme(GuiGraphics g, Button b, Config.Theme t, boolean hover) {
@@ -589,7 +693,7 @@ public class ModulesScreen extends Screen {
                 selected ? 0xFFFFFFFF : 0xFFB4BAC6, false);
     }
 
-    private static void drawRow(GuiGraphics g, Button b, String name, String info, boolean hover) {
+    private static void drawInfoRow(GuiGraphics g, Button b, String name, String info, boolean hover) {
         int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
         rounded(g, x, y, w, h, hover ? CARD_HOVER : CARD);
         Font font = font();
